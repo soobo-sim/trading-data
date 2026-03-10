@@ -44,16 +44,9 @@ async def get_exchange_status():
 
 @router.get("/ws/status")
 async def get_ws_status():
-    """BitFlyer Public WS 연결 상태"""
+    """BitFlyer Public WS 연결 상태 (멀티 product)"""
     ws = get_bitflyer_ws_client()
-    settings = get_settings()
-    recent = ws.get_recent_trades(seconds=30)
-    return {
-        "running": ws._running,
-        "product_code": settings.BITFLYER_PRODUCT_CODE,
-        "recent_trade_count": len(recent),
-        "latest_ticker": ws.latest_ticker,
-    }
+    return ws.get_status()
 
 
 @router.get("/ws/market-pulse")
@@ -67,12 +60,24 @@ async def get_market_pulse(
     win = window_sec or settings.WS_WINDOW_SEC
     pc = (product_code or settings.BITFLYER_PRODUCT_CODE).upper()
     ws = get_bitflyer_ws_client()
-    trades = ws.get_recent_trades(seconds=win)
-    orderbook = ws.latest_board
+    trades = ws.get_recent_trades(seconds=win, product_code=pc)
+    orderbook = ws.get_latest_board(pc)
     return calculate_bf_market_pulse(trades, orderbook, pc, win)
 
 
 @router.get("/ws/recent-trades")
-async def get_recent_trades(seconds: int = Query(30, ge=1, le=600)):
+async def get_recent_trades(
+    product_code: Optional[str] = Query(None),
+    seconds: int = Query(30, ge=1, le=600),
+):
+    settings = get_settings()
     ws = get_bitflyer_ws_client()
-    return {"trades": ws.get_recent_trades(seconds=seconds), "window_sec": seconds}
+    pc = (product_code or settings.BITFLYER_PRODUCT_CODE).upper()
+    return {"product_code": pc, "trades": ws.get_recent_trades(seconds=seconds, product_code=pc), "window_sec": seconds}
+
+
+@router.get("/ws/status")
+async def get_ws_status():
+    """BitFlyer WS 전체 연결 상태 (멀티 product)"""
+    ws = get_bitflyer_ws_client()
+    return ws.get_status()

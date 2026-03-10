@@ -19,7 +19,7 @@ from app import __version__
 from app.core.config import get_settings
 from app.core.exceptions import MarketDataAPIError
 from app.database import init_db, close_db
-from app.routes import ck_market, bf_market, candles as candles_router
+from app.routes import ck_market, bf_market, candles as candles_router, bf_candles as bf_candles_router
 
 
 def setup_logging():
@@ -84,11 +84,25 @@ async def lifespan(app: FastAPI):
         bf_ws = get_bitflyer_ws_client()
         task = asyncio.create_task(bf_ws.connect(), name="bf_ws_client")
         _background_tasks.append(task)
-        logger.info(f"BitFlyer WS 클라이언트 시작. Product: {settings.BITFLYER_PRODUCT_CODE}")
+        logger.info(f"BitFlyer WS 클라이언트 시작. Products: {settings.bf_ws_products_list}")
     except Exception as e:
         logger.warning(f"BitFlyer WS 시작 실패: {e}")
 
-    # 4. Coincheck 캔들 파이프라인 시작 (설정된 모든 pair)
+    # 4. BitFlyer 캔들 파이프라인 시작 (설정된 모든 product)
+    try:
+        from app.services.bf_candle_pipeline import get_bf_candle_pipeline
+        bf_pipeline = get_bf_candle_pipeline()
+        for pc in settings.bf_ws_products_list:
+            task = asyncio.create_task(
+                bf_pipeline.start(pc),
+                name=f"bf_candle_pipeline_start:{pc}",
+            )
+            _background_tasks.append(task)
+        logger.info(f"BitFlyer 캔들 파이프라인 시작 요청: products={settings.bf_ws_products_list}")
+    except Exception as e:
+        logger.warning(f"BitFlyer 캔들 파이프라인 시작 실패: {e}")
+
+    # 5. Coincheck 캔들 파이프라인 시작 (설정된 모든 pair)
     try:
         from app.services.candle_pipeline import get_candle_pipeline
         pipeline = get_candle_pipeline()
@@ -105,16 +119,24 @@ async def lifespan(app: FastAPI):
     logger.info(f"CoinMarket Data Service 준비 완료 — port 8002")
     yield
 
-    # ── Shutdown ──────────────────────────────────────────
+    # ── Shutdown ─────────────────────────────────────────────────────
     logger.info("CoinMarket Data Service 종료 중...")
 
-    # 캔들 파이프라인 종료 (마지막 flush 포함)
+    # Coincheck 캔들 파이프라인 종료
     try:
         from app.services.candle_pipeline import get_candle_pipeline
         await get_candle_pipeline().stop_all()
-        logger.info("캔들 파이프라인 종료")
+        logger.info("Coincheck 캔들 파이프라인 종료")
     except Exception as e:
-        logger.warning(f"캔들 파이프라인 종료 오류: {e}")
+        logger.warning(f"Coincheck 캔들 파이프라인 종료 오류: {e}")
+
+    # BitFlyer 캔들 파이프라인 종료
+    try:
+        from app.services.bf_candle_pipeline import get_bf_candle_pipeline
+        await get_bf_candle_pipeline().stop_all()
+        logger.info("BitFlyer 캔들 파이프라인 종료")
+    except Exception as e:
+        logger.warning(f"BitFlyer 캔들 파이프라인 종료 오류: {e}")
 
     for task in _background_tasks:
         if not task.done():
@@ -200,6 +222,7 @@ async def internal_error_handler(request: Request, exc):
 app.include_router(ck_market.router)
 app.include_router(bf_market.router)
 app.include_router(candles_router.router)
+app.include_router(bf_candles_router.router)
 
 
 @app.get("/", tags=["Root"])
@@ -212,7 +235,8 @@ async def root():
         "endpoints": {
             "coincheck_market": "/api/ck/ticker | /api/ck/order_books | /api/ck/trades | /api/ck/ws/market-pulse",
             "bitflyer_market": "/api/bf/ticker | /api/bf/order_books | /api/bf/trades | /api/bf/ws/market-pulse",
-            "candles": "/api/ck/candles/{pair}/{timeframe} | /api/ck/candles/{pair}/status",
+            "ck_candles": "/api/ck/candles/{pair}/{timeframe} | /api/ck/candles/{pair}/status",
+            "bf_candles": "/api/bf/candles/{product_code}/{timeframe} | /api/bf/candles/{product_code}/status",
         },
     }
 
