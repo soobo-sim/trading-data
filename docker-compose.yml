@@ -1,0 +1,46 @@
+services:
+  coinmarket-data:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: coinmarket-data
+    container_name: coinmarket-data
+    ports:
+      - "8002:8002"
+    environment:
+      - LOG_LEVEL=info
+      - TZ=Asia/Tokyo
+      # coincheck-trader의 postgres 컨테이너(coincheck-postgres)를 공유
+      - DATABASE_URL=postgresql+asyncpg://trader:trader_password_123@coincheck-postgres:5432/trader_db
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - trader-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# postgres는 coincheck-trader의 docker-compose.yml에서 관리.
+# coincheck-trader를 먼저 시작한 후 이 서비스를 실행하세요.
+# cd coincheck-trader && docker-compose up -d
+# cd coinmarket-data  && docker-compose up -d
+
+networks:
+  trader-network:
+    external: true
+    name: coincheck-trader_trader-network  # coincheck-trader docker-compose가 생성한 실제 네트워크명
+
