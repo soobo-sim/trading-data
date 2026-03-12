@@ -6,7 +6,7 @@ bf_candles: BitFlyer 캔들 (신규 테이블)
 """
 from sqlalchemy import (
     Column, BigInteger, Integer, String, Boolean,
-    DateTime, Numeric, Index, UniqueConstraint,
+    DateTime, Numeric, Index, PrimaryKeyConstraint,
 )
 from sqlalchemy.sql import func
 from app.database import Base
@@ -19,7 +19,6 @@ class CkCandle(Base):
     """
     __tablename__ = "ck_candles"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
     pair = Column(String(20), nullable=False)
     timeframe = Column(String(5), nullable=False)    # "1h" | "4h"
     open_time = Column(DateTime(timezone=True), nullable=False)
@@ -35,7 +34,7 @@ class CkCandle(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("pair", "timeframe", "open_time", name="uq_ck_candles_pair_tf_open"),
+        PrimaryKeyConstraint("pair", "timeframe", "open_time", name="ck_candles_pkey"),
         Index("idx_ck_candles_lookup", "pair", "timeframe", "open_time"),
         Index("idx_ck_candles_incomplete", "pair", "timeframe", "is_complete"),
     )
@@ -51,7 +50,6 @@ class BfCandle(Base):
     """
     __tablename__ = "bf_candles"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
     product_code = Column(String(20), nullable=False)   # BTC_JPY 등
     timeframe = Column(String(5), nullable=False)         # "1h" | "4h"
     open_time = Column(DateTime(timezone=True), nullable=False)
@@ -67,7 +65,7 @@ class BfCandle(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("product_code", "timeframe", "open_time", name="uq_bf_candles_pc_tf_open"),
+        PrimaryKeyConstraint("product_code", "timeframe", "open_time", name="bf_candles_pkey"),
         Index("idx_bf_candles_lookup", "product_code", "timeframe", "open_time"),
         Index("idx_bf_candles_incomplete", "product_code", "timeframe", "is_complete"),
     )

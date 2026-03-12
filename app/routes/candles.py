@@ -8,7 +8,7 @@ GET /api/ck/candles/{pair}/{timeframe}/rsi      — RSI 계산
 """
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
@@ -18,6 +18,15 @@ from app.services.candle_pipeline import get_candle_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ck/candles", tags=["Candles"])
+
+_JST = timezone(timedelta(hours=9))
+
+
+def _to_jst(dt: datetime) -> datetime:
+    """naive UTC datetime → JST(+09:00) aware datetime"""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_JST)
 
 # NOTE: /{pair}/status 는 /{pair}/{timeframe}보다 반드시 먼저 등록
 
@@ -66,8 +75,8 @@ async def get_pipeline_status(pair: str):
         "pair": pair,
         "is_running": pipeline.is_running(pair),
         "running_pairs": pipeline.running_pairs(),
-        "latest_4h_candle": latest_4h,
-        "latest_1h_candle": latest_1h,
+        "latest_4h_candle": _to_jst(latest_4h) if latest_4h else None,
+        "latest_1h_candle": _to_jst(latest_1h) if latest_1h else None,
         "rsi_1h": await candle_svc.get_rsi(pair, "1h"),
         "rsi_4h": await candle_svc.get_rsi(pair, "4h"),
     }
@@ -90,7 +99,7 @@ async def get_candles(
         "candles": [
             CandleResponse(
                 pair=c.pair, timeframe=c.timeframe,
-                open_time=c.open_time, close_time=c.close_time,
+                open_time=_to_jst(c.open_time), close_time=_to_jst(c.close_time),
                 open=float(c.open), high=float(c.high), low=float(c.low), close=float(c.close),
                 volume=float(c.volume), tick_count=c.tick_count, is_complete=c.is_complete,
             )
@@ -110,7 +119,7 @@ async def get_current_candle(pair: str, timeframe: str):
         "success": True, "pair": pair, "timeframe": timeframe,
         "current_candle": CandleResponse(
             pair=candle.pair, timeframe=candle.timeframe,
-            open_time=candle.open_time, close_time=candle.close_time,
+            open_time=_to_jst(candle.open_time), close_time=_to_jst(candle.close_time),
             open=float(candle.open), high=float(candle.high), low=float(candle.low), close=float(candle.close),
             volume=float(candle.volume), tick_count=candle.tick_count, is_complete=candle.is_complete,
         ),

@@ -17,7 +17,7 @@ from decimal import Decimal
 from typing import Optional, Dict, Tuple
 
 import httpx
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, and_, desc, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -91,11 +91,42 @@ class CandleService:
                 self._current[pair][tf] = curr
         return completed
 
+    async def recover_stale_candles(self) -> int:
+        """
+        기동 시 복구 로직 — close_time이 경과했으나 is_complete=False인 캔들을 일괄 완결 처리.
+        장애/재시작으로 인해 메모리에서 flush되지 못한 캔들 대비.
+        """
+        now = datetime.now(timezone.utc)
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                update(CkCandle)
+                .where(and_(CkCandle.is_complete == False, CkCandle.close_time < now))
+                .values(is_complete=True, updated_at=now)
+                .returning(CkCandle.pair, CkCandle.timeframe, CkCandle.open_time)
+            )
+            rows = result.fetchall()
+            await db.commit()
+        if rows:
+            logger.warning(
+                "[CandleService] 장애 복구: stale ck_candles %d건 is_complete=True 처리",
+                len(rows),
+            )
+            for r in rows:
+                logger.info("  → ck_candles: %s %s open=%s", r.pair, r.timeframe, r.open_time)
+        return len(rows)
+
     async def flush_current_candles(self, pair: str) -> None:
         """진행 중인 캔들을 DB에 저장 (재시작 대비 주기 저장용)."""
         async with self._lock:
+            now = datetime.now(timezone.utc)
             for tf, candle in (self._current.get(pair) or {}).items():
-                candle.updated_at = datetime.now(timezone.utc)
+                if not candle.is_complete and candle.close_time < now:
+                    candle.is_complete = True
+                    logger.info(
+                        "[CandleService] %s %s: close_time 경과로 캔들 자동 완결 open=%s",
+                        pair, tf, candle.open_time,
+                    )
+                candle.updated_at = now
                 await self._upsert_candle(candle)
 
     # ── 조회 ────────────────────────────────────────────────────
@@ -280,7 +311,7 @@ class CandleService:
                 created_at=candle.created_at or datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc),
             ).on_conflict_do_update(
-                constraint="uq_ck_candles_pair_tf_open",
+                index_elements=["pair", "timeframe", "open_time"],
                 set_={
                     "high": candle.high, "low": candle.low, "close": candle.close,
                     "volume": candle.volume, "tick_count": candle.tick_count,
@@ -304,7 +335,7 @@ class CandleService:
                     volume=row["volume"], tick_count=row["tick_count"], is_complete=row["is_complete"],
                     created_at=now, updated_at=now,
                 ).on_conflict_do_update(
-                    constraint="uq_ck_candles_pair_tf_open",
+                    index_elements=["pair", "timeframe", "open_time"],
                     set_={
                         "high": row["high"], "low": row["low"], "close": row["close"],
                         "volume": row["volume"], "tick_count": row["tick_count"],

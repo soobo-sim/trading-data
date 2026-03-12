@@ -68,6 +68,19 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("DB 연결 완료")
 
+    # 1b. 장애 복구: 이전 기동에서 완결되지 못한 stale 캔들 일괄 처리
+    try:
+        from app.services.candle_service import get_candle_service
+        from app.services.bf_candle_service import get_bf_candle_service
+        ck_fixed = await get_candle_service().recover_stale_candles()
+        bf_fixed = await get_bf_candle_service().recover_stale_candles()
+        if ck_fixed or bf_fixed:
+            logger.warning(f"[Startup] stale 캔들 복구 완료: CK={ck_fixed}건, BF={bf_fixed}건")
+        else:
+            logger.info("[Startup] stale 캔들 없음 (정상 종료 이력)")
+    except Exception as e:
+        logger.warning(f"[Startup] stale 캔들 복구 오류: {e}")
+
     # 2. Coincheck Public WebSocket 시작
     try:
         from app.services.ck_ws_client import get_coincheck_ws_client
