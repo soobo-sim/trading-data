@@ -192,6 +192,44 @@ class BfCandleService:
         rs = avg_gain / avg_loss
         return round(100 - (100 / (1 + rs)), 2)
 
+    async def get_ema(
+        self, product_code: str, timeframe: str, period: int = 20
+    ) -> Optional[dict]:
+        """EMA(period) + 기울기(slope_pct) 계산. period+1개 미만이면 None."""
+        limit = max(period * 2, period + 1)
+        candles = await self.get_completed_candles(product_code, timeframe, limit=limit)
+        if len(candles) < period + 1:
+            return None
+        closes = [float(c.close) for c in candles]
+        k = 2.0 / (period + 1)
+        ema = sum(closes[:period]) / period
+        for price in closes[period:]:
+            ema = price * k + ema * (1 - k)
+        ema_prev = sum(closes[:period]) / period
+        for price in closes[period:-1]:
+            ema_prev = price * k + ema_prev * (1 - k)
+        slope_pct = round((ema - ema_prev) / ema_prev * 100, 4) if ema_prev > 0 else 0.0
+        return {"ema": round(ema, 6), "slope_pct": slope_pct, "candles_used": len(closes)}
+
+    async def get_atr(
+        self, product_code: str, timeframe: str, period: int = 14
+    ) -> Optional[dict]:
+        """ATR(period) 계산. period+1개 미만이면 None."""
+        candles = await self.get_completed_candles(product_code, timeframe, limit=period + 1)
+        if len(candles) < period + 1:
+            return None
+        trs = []
+        for i in range(1, len(candles)):
+            h = float(candles[i].high)
+            l = float(candles[i].low)
+            prev_c = float(candles[i - 1].close)
+            trs.append(max(h - l, abs(h - prev_c), abs(l - prev_c)))
+        atr_window = trs[-period:] if len(trs) >= period else trs
+        atr = sum(atr_window) / len(atr_window)
+        last_close = float(candles[-1].close)
+        atr_pct = round(atr / last_close * 100, 4) if last_close > 0 else 0.0
+        return {"atr": round(atr, 6), "atr_pct": atr_pct, "candles_used": len(candles)}
+
     # ── 백필 (REST) ─────────────────────────────────────────────
 
     async def backfill(self, product_code: str, days: int = 7) -> int:

@@ -20,6 +20,7 @@ from app.core.config import get_settings
 from app.core.exceptions import MarketDataAPIError
 from app.database import init_db, close_db
 from app.routes import ck_market, bf_market, candles as candles_router, bf_candles as bf_candles_router
+from app.routes import system as system_router
 
 
 def setup_logging():
@@ -236,6 +237,7 @@ app.include_router(ck_market.router)
 app.include_router(bf_market.router)
 app.include_router(candles_router.router)
 app.include_router(bf_candles_router.router)
+app.include_router(system_router.router)
 
 
 @app.get("/", tags=["Root"])
