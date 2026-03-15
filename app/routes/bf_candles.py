@@ -9,7 +9,7 @@ GET /api/bf/candles/{product_code}/{timeframe}/ema      — EMA 값 + 기울기 
 GET /api/bf/candles/{product_code}/{timeframe}/atr      — ATR 값 (손절폭/변동성 측정)
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
@@ -19,6 +19,16 @@ from app.services.bf_candle_pipeline import get_bf_candle_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/bf/candles", tags=["BitFlyer Candles"])
+
+_JST = timezone(timedelta(hours=9))
+
+
+def _to_jst(dt: datetime) -> datetime:
+    """naive UTC datetime → JST(+09:00) aware datetime"""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_JST)
+
 
 # NOTE: /{product_code}/status は /{product_code}/{timeframe} より前に登録すること
 
@@ -68,8 +78,8 @@ async def get_pipeline_status(product_code: str):
         "product_code": pc,
         "is_running": pipeline.is_running(pc),
         "running_products": pipeline.running_products(),
-        "latest_4h_candle": latest_4h,
-        "latest_1h_candle": latest_1h,
+        "latest_4h_candle": _to_jst(datetime.fromisoformat(latest_4h)) if latest_4h else None,
+        "latest_1h_candle": _to_jst(datetime.fromisoformat(latest_1h)) if latest_1h else None,
         "rsi_1h": await candle_svc.get_rsi(pc, "1h"),
         "rsi_4h": await candle_svc.get_rsi(pc, "4h"),
     }
@@ -93,7 +103,7 @@ async def get_candles(
         "candles": [
             BfCandleResponse(
                 product_code=c.product_code, timeframe=c.timeframe,
-                open_time=c.open_time, close_time=c.close_time,
+                open_time=_to_jst(c.open_time), close_time=_to_jst(c.close_time),
                 open=float(c.open), high=float(c.high), low=float(c.low), close=float(c.close),
                 volume=float(c.volume), tick_count=c.tick_count, is_complete=c.is_complete,
             )
@@ -114,7 +124,7 @@ async def get_current_candle(product_code: str, timeframe: str):
         "success": True, "product_code": pc, "timeframe": timeframe,
         "current_candle": BfCandleResponse(
             product_code=candle.product_code, timeframe=candle.timeframe,
-            open_time=candle.open_time, close_time=candle.close_time,
+            open_time=_to_jst(candle.open_time), close_time=_to_jst(candle.close_time),
             open=float(candle.open), high=float(candle.high), low=float(candle.low),
             close=float(candle.close), volume=float(candle.volume),
             tick_count=candle.tick_count, is_complete=candle.is_complete,
