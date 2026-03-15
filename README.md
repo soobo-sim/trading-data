@@ -50,18 +50,18 @@ Coincheck / BitFlyer 시장 데이터 수집·배포 독립 서비스 (port **80
 
 ## 시작 순서
 
-```bash
-# 1. coincheck-trader (PostgreSQL 포함) 먼저 기동
-cd coincheck-trader && docker-compose up -d
+coinmarket-data가 **PostgreSQL과 `trader-network`를 제공**합니다. 반드시 먼저 기동하세요.
 
-# 2. coinmarket-data 기동 (외부 trader-network 참조)
+```bash
+# 1. coinmarket-data 먼저 기동 (PostgreSQL + trader-network 제공)
 cd coinmarket-data && docker-compose up -d --build
 
-# 3. bf_candles 테이블 마이그레이션
+# 2. bf_candles 테이블 마이그레이션
 docker exec coinmarket-data alembic upgrade head
 
-# 4. bitflyer-trader 기동
-cd bitflyer-trader && docker-compose up -d
+# 3. coincheck-trader / bitflyer-trader (순서 무관)
+cd coincheck-trader && docker-compose up -d --build
+cd bitflyer-trader  && docker-compose up -d --build
 ```
 
 ---
