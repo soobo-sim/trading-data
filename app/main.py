@@ -22,6 +22,7 @@ from app.database import init_db, close_db
 from app.routes import ck_market, bf_market, candles as candles_router, bf_candles as bf_candles_router
 from app.routes import system as system_router
 from app.routes import status as status_router
+from app.routes import bf_funding_rate as bf_funding_rate_router
 
 
 def setup_logging():
@@ -130,13 +131,25 @@ async def lifespan(app: FastAPI):
         logger.info(f"캔들 파이프라인 시작 요청: pairs={settings.ck_ws_pairs_list}")
     except Exception as e:
         logger.warning(f"캔들 파이프라인 시작 실패: {e}")
-
+    # 6. BitFlyer 펀딩레이트 폴러 시작 (FX_BTC_JPY, 15분 주기)
+    try:
+        from app.services.bf_funding_rate_service import get_bf_funding_rate_service
+        await get_bf_funding_rate_service().start()
+        logger.info("BitFlyer 펀딩레이트 폴러 시작 (FX_BTC_JPY)")
+    except Exception as e:
+        logger.warning(f"BitFlyer 펀딩레이트 폴러 시작 실패: {e}")
     logger.info(f"CoinMarket Data Service 준비 완료 — port 8002")
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────
     logger.info("CoinMarket Data Service 종료 중...")
-
+    # 펀딩레이트 폴러 종료
+    try:
+        from app.services.bf_funding_rate_service import get_bf_funding_rate_service
+        await get_bf_funding_rate_service().stop()
+        logger.info("펀딩레이트 폴러 종료")
+    except Exception as e:
+        logger.warning(f"펀딩레이트 폴러 종료 오류: {e}")
     # Coincheck 캔들 파이프라인 종료
     try:
         from app.services.candle_pipeline import get_candle_pipeline
@@ -238,6 +251,7 @@ app.include_router(ck_market.router)
 app.include_router(bf_market.router)
 app.include_router(candles_router.router)
 app.include_router(bf_candles_router.router)
+app.include_router(bf_funding_rate_router.router)
 app.include_router(system_router.router)
 app.include_router(status_router.router)
 
@@ -254,6 +268,7 @@ async def root():
             "bitflyer_market": "/api/bf/ticker | /api/bf/order_books | /api/bf/trades | /api/bf/ws/market-pulse",
             "ck_candles": "/api/ck/candles/{pair}/{timeframe} | /api/ck/candles/{pair}/status",
             "bf_candles": "/api/bf/candles/{product_code}/{timeframe} | /api/bf/candles/{product_code}/status",
+            "bf_funding_rate": "/api/bf/funding-rate | /api/bf/funding-rate/history",
         },
     }
 

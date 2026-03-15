@@ -55,14 +55,15 @@ async def get_market_pulse(
     product_code: Optional[str] = Query(None),
     window_sec: int = Query(None, ge=5, le=600),
 ):
-    """WS 버퍼 기반 BitFlyer 시장 분석"""
+    """WS 버퍼 기반 BitFlyer 시장 분석 (fx_spread_pct 포함 시 FX_BTC_JPY 수집 중이어야 함)"""
     settings = get_settings()
     win = window_sec or settings.WS_WINDOW_SEC
     pc = (product_code or settings.BITFLYER_PRODUCT_CODE).upper()
     ws = get_bitflyer_ws_client()
     trades = ws.get_recent_trades(seconds=win, product_code=pc)
     orderbook = ws.get_latest_board(pc)
-    return calculate_bf_market_pulse(trades, orderbook, pc, win)
+    fx_spread_pct = ws.get_fx_spread()
+    return calculate_bf_market_pulse(trades, orderbook, pc, win, fx_spread_pct=fx_spread_pct)
 
 
 @router.get("/ws/recent-trades")

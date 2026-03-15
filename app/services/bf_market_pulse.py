@@ -13,6 +13,7 @@ def calculate_bf_market_pulse(
     orderbook: Optional[dict],
     product_code: str,
     window_sec: int,
+    fx_spread_pct: Optional[float] = None,
 ) -> dict:
     """BitFlyer 체결 데이터 기반 Market Pulse 계산 (side=BUY/SELL, size 필드)"""
     trade_count = len(trades)
@@ -86,4 +87,5 @@ def calculate_bf_market_pulse(
         "buy_volume": round(buy_volume, 6),
         "sell_volume": round(sell_volume, 6),
         "orderbook_imbalance": orderbook_imbalance,
+        "fx_spread_pct": fx_spread_pct,
     }
