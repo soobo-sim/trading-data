@@ -37,7 +37,6 @@ class BitFlyerWSClient:
         settings = get_settings()
         self.ws_url = settings.BITFLYER_WS_URL
         self.products = settings.bf_ws_products_list          # ["BTC_JPY", "ETH_JPY", "XRP_JPY"]
-        self.product_code = settings.BITFLYER_PRODUCT_CODE.upper()  # 하위호환 (primary)
         self.window_sec = settings.WS_WINDOW_SEC
         self.max_trades = settings.WS_MAX_TRADES
         self.reconnect_max_delay = settings.WS_RECONNECT_MAX_DELAY
@@ -92,19 +91,35 @@ class BitFlyerWSClient:
     # ── 조회 ──────────────────────────────────────────────────
 
     def get_recent_trades(self, seconds: int = 30, product_code: Optional[str] = None) -> list:
-        """product_code 미지정 시 primary product 사용 (하위호환)"""
-        pc = (product_code or self.product_code).upper()
+        """product_code 미지정 시 첫 번째 product 사용"""
+        pc = (product_code or self.products[0]).upper()
         buf = self.trades.get(pc, deque())
         cutoff = datetime.now(timezone.utc).timestamp() - seconds
         return [t for t in buf if t.get("_ts", 0) >= cutoff]
 
     def get_latest_ticker(self, product_code: Optional[str] = None) -> Optional[dict]:
-        pc = (product_code or self.product_code).upper()
+        pc = (product_code or self.products[0]).upper()
         return self.latest_ticker.get(pc)
 
     def get_latest_board(self, product_code: Optional[str] = None) -> Optional[dict]:
-        pc = (product_code or self.product_code).upper()
+        pc = (product_code or self.products[0]).upper()
         return self.latest_board.get(pc)
+
+    def get_fx_spread(self) -> Optional[float]:
+        """
+        FX_BTC_JPY vs BTC_JPY ticker 스프레드 계산 (SFD 레벨 판단용).
+        두 product 모두 ticker가 있을 때만 계산. 없으면 None 반환.
+        반환값: FX 프리미엄 비율 (%) — 양수=FX가 현물보다 비쌈, 음수=FX가 쌈.
+        """
+        fx_ticker = self.latest_ticker.get("FX_BTC_JPY")
+        spot_ticker = self.latest_ticker.get("BTC_JPY")
+        if not fx_ticker or not spot_ticker:
+            return None
+        fx_ltp = fx_ticker.get("ltp") or fx_ticker.get("last")
+        spot_ltp = spot_ticker.get("ltp") or spot_ticker.get("last")
+        if not fx_ltp or not spot_ltp or float(spot_ltp) == 0:
+            return None
+        return round((float(fx_ltp) - float(spot_ltp)) / float(spot_ltp) * 100, 4)
 
     def get_status(self) -> dict:
         return {

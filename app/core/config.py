@@ -34,7 +34,6 @@ class Settings(BaseSettings):
     # ── BitFlyer ──────────────────────────────────────────────────
     BITFLYER_BASE_URL: str = "https://api.bitflyer.com"
     BITFLYER_WS_URL: str = "wss://ws.lightstream.bitflyer.com/json-rpc"
-    BITFLYER_PRODUCT_CODE: str = "BTC_JPY"        # 하위 호환 (primary)
     BF_WS_PRODUCTS: str = "BTC_JPY"               # 쉼표 구분 (예: "BTC_JPY,ETH_JPY,XRP_JPY")
 
     @property

@@ -1,4 +1,38 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: trader-postgres
+    environment:
+      - POSTGRES_DB=trader_db
+      - POSTGRES_USER=trader
+      - POSTGRES_PASSWORD=trader_password_123
+      - TZ=Asia/Tokyo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres_logs:/var/log/postgresql
+    command: >
+      postgres
+      -c logging_collector=on
+      -c log_directory=/var/log/postgresql
+      -c log_filename=postgresql-%Y-%m-%d.log
+      -c log_rotation_age=1d
+      -c log_rotation_size=100MB
+      -c log_truncate_on_rotation=off
+      -c log_statement=all
+      -c log_duration=on
+      -c log_connections=on
+      -c log_disconnections=on
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trader -d trader_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trader-network
+
   coinmarket-data:
     build:
       context: .
@@ -11,8 +45,7 @@ services:
     environment:
       - LOG_LEVEL=info
       - TZ=Asia/Tokyo
-      # coincheck-trader의 postgres 컨테이너(coincheck-postgres)를 공유
-      - DATABASE_URL=postgresql+asyncpg://trader:trader_password_123@coincheck-postgres:5432/trader_db
+      - DATABASE_URL=postgresql+asyncpg://trader:trader_password_123@trader-postgres:5432/trader_db
     env_file:
       - .env
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002", "--log-level", "info", "--reload"]
@@ -20,6 +53,9 @@ services:
       - ./logs:/app/logs
       - ./app:/app/app
       - ./alembic:/app/alembic
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
@@ -35,13 +71,19 @@ services:
         max-size: "10m"
         max-file: "3"
 
-# postgres는 coincheck-trader의 docker-compose.yml에서 관리.
-# coincheck-trader를 먼저 시작한 후 이 서비스를 실행하세요.
-# cd coincheck-trader && docker-compose up -d
+# 기동 순서: coinmarket-data → coincheck-trader → bitflyer-trader
+# coinmarket-data가 PostgreSQL과 trader-network를 제공한다.
 # cd coinmarket-data  && docker-compose up -d
+# cd coincheck-trader && docker-compose up -d
+# cd bitflyer-trader  && docker-compose up -d
+
+volumes:
+  postgres_data:
+    external: true
+    name: trader_postgres_data
 
 networks:
   trader-network:
     external: true
-    name: trader-network  # coincheck-trader docker-compose.yml의 name: trader-network 참조
+    name: trader-network
 

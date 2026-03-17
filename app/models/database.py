@@ -72,3 +72,25 @@ class BfCandle(Base):
 
     def __repr__(self):
         return f"<BfCandle {self.product_code} {self.timeframe} {self.open_time} complete={self.is_complete}>"
+
+
+class BfFundingRate(Base):
+    """
+    BitFlyer 펀딩레이트 수집 이력 (15분 폴링)
+    Public API: GET /v1/getfundingrate
+    """
+    __tablename__ = "bf_funding_rates"
+
+    id = Column(BigInteger, autoincrement=True, nullable=False)
+    product_code = Column(String(20), nullable=False)
+    current_funding_rate = Column(Numeric(12, 8), nullable=False)
+    next_settlement_date = Column(DateTime(timezone=True), nullable=True)
+    collected_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        PrimaryKeyConstraint("id", name="bf_funding_rates_pkey"),
+        Index("idx_bf_funding_rates_lookup", "product_code", "collected_at"),
+    )
+
+    def __repr__(self):
+        return f"<BfFundingRate {self.product_code} rate={self.current_funding_rate} at={self.collected_at}>"

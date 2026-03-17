@@ -48,25 +48,25 @@ class BitFlyerPublicClient:
     async def get_ticker(self, product_code: Optional[str] = None) -> dict:
         """GET /v1/getticker"""
         settings = get_settings()
-        pc = (product_code or settings.BITFLYER_PRODUCT_CODE).upper()
+        pc = (product_code or settings.bf_ws_products_list[0]).upper()
         return await self._get("/v1/getticker", params={"product_code": pc})
 
     async def get_board(self, product_code: Optional[str] = None) -> dict:
         """GET /v1/getboard — 호가창 (mid_price + bids + asks)"""
         settings = get_settings()
-        pc = (product_code or settings.BITFLYER_PRODUCT_CODE).upper()
+        pc = (product_code or settings.bf_ws_products_list[0]).upper()
         return await self._get("/v1/getboard", params={"product_code": pc})
 
     async def get_executions(self, product_code: Optional[str] = None, count: int = 100) -> list:
         """GET /v1/getexecutions — 공개 체결 이력"""
         settings = get_settings()
-        pc = (product_code or settings.BITFLYER_PRODUCT_CODE).upper()
+        pc = (product_code or settings.bf_ws_products_list[0]).upper()
         return await self._get("/v1/getexecutions", params={"product_code": pc, "count": count})
 
     async def get_exchange_status(self) -> dict:
         """GET /v1/gethealth — 거래소 상태"""
         settings = get_settings()
-        pc = settings.BITFLYER_PRODUCT_CODE.upper()
+        pc = settings.bf_ws_products_list[0].upper()
         return await self._get("/v1/gethealth", params={"product_code": pc})
 
     async def get_markets(self) -> list:
