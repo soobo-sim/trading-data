@@ -45,6 +45,14 @@ Coincheck / BitFlyer 시장 데이터 수집·배포 독립 서비스 (port **80
 | `GET /api/bf/ws/status` | WS 연결 상태 |
 | `GET /api/bf/ws/market-pulse` | 시장 강도 지표 |
 | `GET /api/bf/ws/recent-trades` | 최근 WS 체결 |
+| `GET /api/bf/funding-rate` | FX_BTC_JPY 최신 펀딩레이트 |
+| `GET /api/bf/funding-rate/history` | 펀딩레이트 수집 이력 |
+
+### 인프라 공통
+
+| 경로 | 설명 |
+|------|------|
+| `GET /api/status` | 전체 수집 현황 — CK/BF 캔들·WS·펀딩레이트 폴러 상태 (레이첼 분석 전 사전 확인용) |
 
 ---
 

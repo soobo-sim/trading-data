@@ -125,7 +125,7 @@ async def lifespan(app: FastAPI):
         for pair in settings.ck_ws_pairs_list:
             task = asyncio.create_task(
                 pipeline.start(pair),
-                name=f"candle_pipeline_start:{pair}",
+                name=f"ck_candle_pipeline_start:{pair}",
             )
             _background_tasks.append(task)
         logger.info(f"캔들 파이프라인 시작 요청: pairs={settings.ck_ws_pairs_list}")

@@ -18,6 +18,7 @@ from app.services.candle_pipeline import get_candle_pipeline
 from app.services.bf_candle_pipeline import get_bf_candle_pipeline
 from app.services.ck_ws_client import get_coincheck_ws_client
 from app.services.bf_ws_client import get_bitflyer_ws_client
+from app.services.bf_funding_rate_service import get_bf_funding_rate_service
 
 router = APIRouter(prefix="/api", tags=["Status"])
 
@@ -126,6 +127,7 @@ async def get_status():
     bf_running_products: list[str] = bf_pipeline.running_products()
     ck_ws_status = ck_ws.get_status()
     bf_ws_status = bf_ws.get_status()
+    funding_rate_status = get_bf_funding_rate_service().get_status()
 
     # ── DB 조회 ────────────────────────────────────────────────
     async with AsyncSessionLocal() as db:
@@ -172,4 +174,5 @@ async def get_status():
                 "subscribed_products": bf_ws_status.get("subscribed_products", []),
             },
         },
+        "bf_funding_rate_poller": funding_rate_status,
     }

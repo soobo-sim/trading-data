@@ -87,6 +87,18 @@ class BfFundingRateService:
             rows = result.scalars().all()
             return [self._to_dict(r) for r in rows]
 
+    def get_status(self) -> dict:
+        """폴러 실행 상태 반환 (헬스체크용)"""
+        task_alive = (
+            self._task is not None
+            and not self._task.done()
+        )
+        return {
+            "running": self._running and task_alive,
+            "poll_interval_sec": _POLL_INTERVAL,
+            "product_code": _PRODUCT_CODE,
+        }
+
     # ── 내부 ──────────────────────────────────────────────────
 
     async def _poll_loop(self) -> None:
