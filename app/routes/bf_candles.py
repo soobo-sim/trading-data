@@ -78,8 +78,8 @@ async def get_pipeline_status(product_code: str):
         "product_code": pc,
         "is_running": pipeline.is_running(pc),
         "running_products": pipeline.running_products(),
-        "latest_4h_candle": _to_jst(datetime.fromisoformat(latest_4h)) if latest_4h else None,
-        "latest_1h_candle": _to_jst(datetime.fromisoformat(latest_1h)) if latest_1h else None,
+        "latest_4h_candle": _to_jst(latest_4h) if latest_4h else None,
+        "latest_1h_candle": _to_jst(latest_1h) if latest_1h else None,
         "rsi_1h": await candle_svc.get_rsi(pc, "1h"),
         "rsi_4h": await candle_svc.get_rsi(pc, "4h"),
     }
