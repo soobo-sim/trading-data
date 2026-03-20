@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     BITFLYER_WS_URL: str = "wss://ws.lightstream.bitflyer.com/json-rpc"
     BF_WS_PRODUCTS: str = "BTC_JPY"               # 쉼표 구분 (예: "BTC_JPY,ETH_JPY,XRP_JPY")
 
+    # ── GMO FX ────────────────────────────────────────────────
+    GMOFX_BASE_URL: str = "https://forex-api.coin.z.com"
+    GMO_FX_PAIRS: str = ""                         # 쉼표 구분 (예: "USD_JPY,EUR_JPY"), 빈 문자열이면 비활성
+
     @property
     def ck_ws_pairs_list(self) -> list[str]:
         return [p.strip() for p in self.CK_WS_PAIRS.split(",") if p.strip()]
@@ -43,6 +47,10 @@ class Settings(BaseSettings):
     @property
     def bf_ws_products_list(self) -> list[str]:
         return [p.strip().upper() for p in self.BF_WS_PRODUCTS.split(",") if p.strip()]
+
+    @property
+    def gmo_fx_pairs_list(self) -> list[str]:
+        return [p.strip().upper() for p in self.GMO_FX_PAIRS.split(",") if p.strip()]
 
     class Config:
         env_file = ".env"

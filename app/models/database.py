@@ -94,3 +94,35 @@ class BfFundingRate(Base):
 
     def __repr__(self):
         return f"<BfFundingRate {self.product_code} rate={self.current_funding_rate} at={self.collected_at}>"
+
+
+class GmoCandle(Base):
+    """
+    GMO FX OHLCV 캔들 (1H / 4H)
+    KLine API 폴링으로 수집 (tick 집계 아님)
+    Volume: GMO FX는 volume 미제공 → 0 고정
+    """
+    __tablename__ = "gmo_candles"
+
+    pair = Column(String(20), nullable=False)             # usd_jpy 등
+    timeframe = Column(String(5), nullable=False)         # "1h" | "4h"
+    open_time = Column(DateTime(timezone=True), nullable=False)
+    close_time = Column(DateTime(timezone=True), nullable=False)
+    open = Column(Numeric(18, 8), nullable=False)
+    high = Column(Numeric(18, 8), nullable=False)
+    low = Column(Numeric(18, 8), nullable=False)
+    close = Column(Numeric(18, 8), nullable=False)
+    volume = Column(Numeric(18, 8), nullable=False, default=0)
+    tick_count = Column(Integer, nullable=False, default=0)
+    is_complete = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        PrimaryKeyConstraint("pair", "timeframe", "open_time", name="gmo_candles_pkey"),
+        Index("idx_gmo_candles_lookup", "pair", "timeframe", "open_time"),
+        Index("idx_gmo_candles_incomplete", "pair", "timeframe", "is_complete"),
+    )
+
+    def __repr__(self):
+        return f"<GmoCandle {self.pair} {self.timeframe} {self.open_time} complete={self.is_complete}>"
