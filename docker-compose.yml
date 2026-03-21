@@ -41,7 +41,7 @@ services:
     image: coinmarket-data
     container_name: coinmarket-data
     ports:
-      - "8002:8002"
+      - "127.0.0.1:8002:8002"
     environment:
       - LOG_LEVEL=info
       - TZ=Asia/Tokyo
