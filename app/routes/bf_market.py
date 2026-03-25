@@ -42,13 +42,6 @@ async def get_exchange_status():
     return await get_bitflyer_public_client().get_exchange_status()
 
 
-@router.get("/ws/status")
-async def get_ws_status():
-    """BitFlyer Public WS 연결 상태 (멀티 product)"""
-    ws = get_bitflyer_ws_client()
-    return ws.get_status()
-
-
 @router.get("/ws/market-pulse")
 @handle_api_errors("BF Market Pulse 조회")
 async def get_market_pulse(

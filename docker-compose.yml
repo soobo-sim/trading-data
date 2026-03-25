@@ -71,11 +71,10 @@ services:
         max-size: "10m"
         max-file: "3"
 
-# 기동 순서: coinmarket-data → coincheck-trader → bitflyer-trader
+# 기동 순서: coinmarket-data → trading-engine
 # coinmarket-data가 PostgreSQL과 trader-network를 제공한다.
 # cd coinmarket-data  && docker-compose up -d
-# cd coincheck-trader && docker-compose up -d
-# cd bitflyer-trader  && docker-compose up -d
+# cd trading-engine   && docker-compose up -d
 
 volumes:
   postgres_data:

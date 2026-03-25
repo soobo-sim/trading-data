@@ -85,16 +85,26 @@ class GmoCandlePipeline:
     async def _poll_worker(self, pair: str) -> None:
         """5분마다 KLine API 폴링 → 최신 캔들 DB UPSERT."""
         svc = get_gmo_candle_service()
+        poll_count = 0
+        # 12회 폴링 = 1시간 (5분 × 12)마다 heartbeat 로그
+        heartbeat_every = 12
         try:
             # 백필 완료 대기 (10초)
             await asyncio.sleep(10)
+            logger.info(f"[GmoCandlePipeline] {pair}: 폴링 워커 시작 (주기 {_POLL_INTERVAL}초)")
             while True:
                 try:
                     count_4h = await svc.poll_and_upsert(pair, "4h")
                     count_1h = await svc.poll_and_upsert(pair, "1h")
+                    poll_count += 1
                     if count_4h or count_1h:
                         logger.debug(
                             f"[GmoCandlePipeline] {pair}: 폴링 upsert 4H={count_4h} 1H={count_1h}"
+                        )
+                    if poll_count % heartbeat_every == 0:
+                        logger.info(
+                            f"[GmoCandlePipeline] {pair}: 폴링 heartbeat — "
+                            f"총 {poll_count}회 실행, 최근 4H={count_4h} 1H={count_1h}"
                         )
                 except Exception as e:
                     logger.error(

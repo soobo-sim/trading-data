@@ -90,7 +90,7 @@ async def get_pipeline_status(product_code: str):
 async def get_candles(
     product_code: str,
     timeframe: str,
-    limit: int = Query(default=30, ge=1, le=200),
+    limit: int = Query(default=30, ge=1, le=500),
 ):
     pc = product_code.upper()
     _validate_product_tf(pc, timeframe)
@@ -138,13 +138,18 @@ async def get_rsi(
     product_code: str,
     timeframe: str,
     period: int = Query(default=14, ge=5, le=50),
+    limit: int = Query(default=200, ge=1, le=500, description="시계열 데이터 수"),
 ):
     pc = product_code.upper()
     _validate_product_tf(pc, timeframe)
-    rsi = await get_bf_candle_service().get_rsi(pc, timeframe, period=period)
+    svc = get_bf_candle_service()
+    rsi = await svc.get_rsi(pc, timeframe, period=period)
+    series = await svc.get_rsi_series(pc, timeframe, period=period, limit=limit)
+    values = [{"time": _to_jst(v["time"]).isoformat(), "value": v["value"]} for v in series]
     return {
         "success": True, "product_code": pc, "timeframe": timeframe,
         "period": period, "rsi": rsi,
+        "values": values,
         "note": None if rsi is not None else f"캔들 데이터 부족 (최소 {period + 1}개 필요)",
     }
 
@@ -155,6 +160,7 @@ async def get_ema(
     product_code: str,
     timeframe: str,
     period: int = Query(default=20, ge=5, le=200, description="EMA 기간 (기본 20)"),
+    limit: int = Query(default=200, ge=1, le=500, description="시계열 데이터 수"),
 ):
     """
     EMA(period) 와 기울기(slope_pct) 반환.
@@ -175,6 +181,7 @@ async def get_ema(
             "success": True, "product_code": pc, "timeframe": timeframe,
             "period": period, "ema": None, "slope_pct": None,
             "price_vs_ema_pct": None, "signal": None,
+            "values": [],
             "note": f"캔들 데이터 부족 (최소 {period + 1}개 필요)",
         }
     candles = await svc.get_completed_candles(pc, timeframe, limit=1)
@@ -186,6 +193,8 @@ async def get_ema(
         above = price_vs_ema_pct >= 0
         rising = result["slope_pct"] >= 0
         signal = ("above" if above else "below") + "_" + ("rising" if rising else "falling")
+    series = await svc.get_ema_series(pc, timeframe, period=period, limit=limit)
+    values = [{"time": _to_jst(v["time"]).isoformat(), "value": v["value"]} for v in series]
     return {
         "success": True,
         "product_code": pc,
@@ -197,6 +206,7 @@ async def get_ema(
         "signal": signal,
         "current_price": current_price,
         "candles_used": result["candles_used"],
+        "values": values,
         "note": None,
     }
 
@@ -208,6 +218,7 @@ async def get_atr(
     timeframe: str,
     period: int = Query(default=14, ge=5, le=100, description="ATR 기간 (기본 14)"),
     stop_multiplier: float = Query(default=2.0, ge=0.5, le=5.0, description="손절폭 배수 (기본 2.0)"),
+    limit: int = Query(default=200, ge=1, le=500, description="시계열 데이터 수"),
 ):
     """
     ATR(period) 반환.
@@ -221,14 +232,20 @@ async def get_atr(
     """
     pc = product_code.upper()
     _validate_product_tf(pc, timeframe)
-    result = await get_bf_candle_service().get_atr(pc, timeframe, period=period)
+    svc = get_bf_candle_service()
+    result = await svc.get_atr(pc, timeframe, period=period)
     if result is None:
         return {
             "success": True, "product_code": pc, "timeframe": timeframe,
             "period": period, "atr": None, "atr_pct": None,
             "stop_loss_distance": None, "trailing_stop_distance": None,
+            "values": [],
             "note": f"캔들 데이터 부족 (최소 {period + 1}개 필요)",
         }
+
+    series = await svc.get_atr_series(pc, timeframe, period=period, limit=limit)
+    values = [{"time": _to_jst(v["time"]).isoformat(), "value": v["value"]} for v in series]
+
     return {
         "success": True,
         "product_code": pc,
@@ -240,5 +257,6 @@ async def get_atr(
         "trailing_stop_distance": round(result["atr"] * 1.5, 6),
         "stop_multiplier": stop_multiplier,
         "candles_used": result["candles_used"],
+        "values": values,
         "note": None,
     }

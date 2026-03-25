@@ -61,16 +61,6 @@ class BitFlyerWSClient:
 
     # ── 구독 인터페이스 ────────────────────────────────────────
 
-    def subscribe(self) -> asyncio.Queue:
-        """전체 메시지 구독 (market-pulse 등)"""
-        q: asyncio.Queue = asyncio.Queue(maxsize=200)
-        self._subscribers.append(q)
-        return q
-
-    def unsubscribe(self, q: asyncio.Queue):
-        if q in self._subscribers:
-            self._subscribers.remove(q)
-
     def subscribe_executions(self, product_code: str) -> asyncio.Queue:
         """특정 product의 체결 틱만 구독 (캔들 파이프라인용)"""
         channel = f"{product_code.upper()}-executions"

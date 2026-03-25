@@ -65,7 +65,7 @@ async def get_pipeline_status(pair: str):
 async def get_candles(
     pair: str,
     timeframe: str,
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=500),
 ):
     from sqlalchemy import select, desc
     from app.database import AsyncSessionLocal

@@ -28,30 +28,15 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.database import AsyncSessionLocal
 from app.models.database import GmoCandle
 from app.services.gmo_public_client import get_gmo_public_client
+from app.services.base_candle_service import get_candle_open_time as _get_candle_open_time, get_candle_close_time as _get_candle_close_time
 
 logger = logging.getLogger(__name__)
-
-TIMEFRAME_SECONDS: Dict[str, int] = {"1h": 3600, "4h": 14400}
 
 # KLine API interval 매핑
 _INTERVAL_MAP = {"1h": "1hour", "4h": "4hour"}
 
 # 4hour → date=YYYY, 1hour → date=YYYYMMDD
 _DATE_FORMAT_MAP = {"1h": "%Y%m%d", "4h": "%Y"}
-
-
-def _get_candle_open_time(dt: datetime, timeframe: str) -> datetime:
-    dt = dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
-    if timeframe == "1h":
-        return dt.replace(minute=0, second=0, microsecond=0)
-    elif timeframe == "4h":
-        hour = (dt.hour // 4) * 4
-        return dt.replace(hour=hour, minute=0, second=0, microsecond=0)
-    raise ValueError(f"Unsupported timeframe: {timeframe}")
-
-
-def _get_candle_close_time(open_time: datetime, timeframe: str) -> datetime:
-    return open_time + timedelta(seconds=TIMEFRAME_SECONDS[timeframe]) - timedelta(microseconds=1)
 
 
 class GmoCandleService:
