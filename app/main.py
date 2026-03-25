@@ -1,6 +1,6 @@
 """
 CoinMarket Data Service
-FastAPI 진입점 — Coincheck / BitFlyer 마켓 데이터 수집 및 API 제공
+FastAPI 진입점 — BitFlyer / GMO FX 마켓 데이터 수집 및 API 제공
 Port: 8002
 """
 import asyncio
@@ -19,7 +19,7 @@ from app import __version__
 from app.core.config import get_settings
 from app.core.exceptions import MarketDataAPIError
 from app.database import init_db, close_db
-from app.routes import ck_market, bf_market, candles as candles_router, bf_candles as bf_candles_router
+from app.routes import bf_market, bf_candles as bf_candles_router
 from app.routes import system as system_router
 from app.routes import status as status_router
 from app.routes import bf_funding_rate as bf_funding_rate_router
@@ -74,30 +74,18 @@ async def lifespan(app: FastAPI):
 
     # 1b. 장애 복구: 이전 기동에서 완결되지 못한 stale 캔들 일괄 처리
     try:
-        from app.services.candle_service import get_candle_service
         from app.services.bf_candle_service import get_bf_candle_service
         from app.services.gmo_candle_service import get_gmo_candle_service
-        ck_fixed = await get_candle_service().recover_stale_candles()
         bf_fixed = await get_bf_candle_service().recover_stale_candles()
         gmo_fixed = await get_gmo_candle_service().recover_stale_candles()
-        if ck_fixed or bf_fixed or gmo_fixed:
-            logger.warning(f"[Startup] stale 캔들 복구 완료: CK={ck_fixed}건, BF={bf_fixed}건, GMO={gmo_fixed}건")
+        if bf_fixed or gmo_fixed:
+            logger.warning(f"[Startup] stale 캔들 복구 완료: BF={bf_fixed}건, GMO={gmo_fixed}건")
         else:
             logger.info("[Startup] stale 캔들 없음 (정상 종료 이력)")
     except Exception as e:
         logger.warning(f"[Startup] stale 캔들 복구 오류: {e}")
 
-    # 2. Coincheck Public WebSocket 시작
-    try:
-        from app.services.ck_ws_client import get_coincheck_ws_client
-        ck_ws = get_coincheck_ws_client()
-        task = asyncio.create_task(ck_ws.run(), name="ck_ws_client")
-        _background_tasks.append(task)
-        logger.info(f"Coincheck WS 클라이언트 시작. Pairs: {ck_ws._pairs}")
-    except Exception as e:
-        logger.warning(f"Coincheck WS 시작 실패: {e}")
-
-    # 3. BitFlyer Public WebSocket 시작
+    # 2. BitFlyer Public WebSocket 시작
     try:
         from app.services.bf_ws_client import get_bitflyer_ws_client
         bf_ws = get_bitflyer_ws_client()
@@ -121,20 +109,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"BitFlyer 캔들 파이프라인 시작 실패: {e}")
 
-    # 5. Coincheck 캔들 파이프라인 시작 (설정된 모든 pair)
-    try:
-        from app.services.candle_pipeline import get_candle_pipeline
-        pipeline = get_candle_pipeline()
-        for pair in settings.ck_ws_pairs_list:
-            task = asyncio.create_task(
-                pipeline.start(pair),
-                name=f"ck_candle_pipeline_start:{pair}",
-            )
-            _background_tasks.append(task)
-        logger.info(f"캔들 파이프라인 시작 요청: pairs={settings.ck_ws_pairs_list}")
-    except Exception as e:
-        logger.warning(f"캔들 파이프라인 시작 실패: {e}")
-    # 6. BitFlyer 펀딩레이트 폴러 시작 (FX_BTC_JPY, 15분 주기)
+    # 4. BitFlyer 펀딩레이트 폴러 시작 (FX_BTC_JPY, 15분 주기)
     try:
         from app.services.bf_funding_rate_service import get_bf_funding_rate_service
         await get_bf_funding_rate_service().start()
@@ -172,13 +147,6 @@ async def lifespan(app: FastAPI):
         logger.info("펀딩레이트 폴러 종료")
     except Exception as e:
         logger.warning(f"펀딩레이트 폴러 종료 오류: {e}")
-    # Coincheck 캔들 파이프라인 종료
-    try:
-        from app.services.candle_pipeline import get_candle_pipeline
-        await get_candle_pipeline().stop_all()
-        logger.info("Coincheck 캔들 파이프라인 종료")
-    except Exception as e:
-        logger.warning(f"Coincheck 캔들 파이프라인 종료 오류: {e}")
 
     # BitFlyer 캔들 파이프라인 종료
     try:
@@ -204,22 +172,9 @@ async def lifespan(app: FastAPI):
         await asyncio.gather(*_background_tasks, return_exceptions=True)
 
     try:
-        from app.services.ck_ws_client import close_coincheck_ws_client
-        await close_coincheck_ws_client()
-        logger.info("Coincheck WS 클라이언트 종료")
-    except Exception:
-        pass
-
-    try:
         from app.services.bf_ws_client import close_bitflyer_ws_client
         await close_bitflyer_ws_client()
         logger.info("BitFlyer WS 클라이언트 종료")
-    except Exception:
-        pass
-
-    try:
-        from app.services.ck_public_client import close_coincheck_public_client
-        await close_coincheck_public_client()
     except Exception:
         pass
 
@@ -284,9 +239,8 @@ async def internal_error_handler(request: Request, exc):
 
 
 # ── 라우터 등록 ────────────────────────────────────────────────
-app.include_router(ck_market.router)
+
 app.include_router(bf_market.router)
-app.include_router(candles_router.router)
 app.include_router(bf_candles_router.router)
 app.include_router(bf_funding_rate_router.router)
 app.include_router(gmo_candles_router.router)
@@ -302,9 +256,7 @@ async def root():
         "docs": "/docs",
         "status": "running",
         "endpoints": {
-            "coincheck_market": "/api/ck/ticker | /api/ck/order_books | /api/ck/trades | /api/ck/ws/market-pulse",
             "bitflyer_market": "/api/bf/ticker | /api/bf/order_books | /api/bf/trades | /api/bf/ws/market-pulse",
-            "ck_candles": "/api/ck/candles/{pair}/{timeframe} | /api/ck/candles/{pair}/status",
             "bf_candles": "/api/bf/candles/{product_code}/{timeframe} | /api/bf/candles/{product_code}/status",
             "bf_funding_rate": "/api/bf/funding-rate | /api/bf/funding-rate/history",
         },

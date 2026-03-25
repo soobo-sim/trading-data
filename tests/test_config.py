@@ -43,18 +43,3 @@ class TestBfWsProductsList:
     def test_empty_string(self):
         s = _settings(BF_WS_PRODUCTS="")
         assert s.bf_ws_products_list == []
-
-
-class TestCkWsPairsList:
-
-    def test_single_pair(self):
-        s = _settings(CK_WS_PAIRS="btc_jpy")
-        assert s.ck_ws_pairs_list == ["btc_jpy"]
-
-    def test_multiple_pairs(self):
-        s = _settings(CK_WS_PAIRS="btc_jpy,eth_jpy,xrp_jpy")
-        assert s.ck_ws_pairs_list == ["btc_jpy", "eth_jpy", "xrp_jpy"]
-
-    def test_whitespace_trimmed(self):
-        s = _settings(CK_WS_PAIRS=" btc_jpy , eth_jpy ")
-        assert s.ck_ws_pairs_list == ["btc_jpy", "eth_jpy"]
