@@ -260,3 +260,60 @@ async def get_atr(
         "values": values,
         "note": None,
     }
+
+
+@router.get("/{product_code}/{timeframe}/bb", summary="BF 볼린저밴드 값")
+@handle_api_errors("BF BB 조회")
+async def get_bb(
+    product_code: str,
+    timeframe: str,
+    period: int = Query(default=20, ge=1, description="BB 기간 (기본 20)"),
+    std_dev: float = Query(default=2.0, description="표준편차 배수 (0.1~5.0)"),
+    limit: int = Query(default=1, ge=1, le=200, description="시계열 데이터 수"),
+):
+    """볼린저밴드 upper/middle/lower + width_pct + price_position_pct 반환."""
+    if std_dev < 0.1 or std_dev > 5.0:
+        raise HTTPException(400, f"std_dev 범위 초과 (0.1~5.0): {std_dev}")
+
+    pc = product_code.upper()
+    _validate_product_tf(pc, timeframe)
+    svc = get_bf_candle_service()
+
+    result = await svc.get_bb(pc, timeframe, period=period, std_dev=std_dev)
+    if result is None:
+        raise HTTPException(400, f"캔들 부족: pair={pc}, timeframe={timeframe}, 최소 {period}개 필요")
+
+    series_raw = await svc.get_bb_series(pc, timeframe, period=period, std_dev=std_dev, limit=limit)
+    values = [
+        {
+            "time": _to_jst(v["time"]).isoformat(),
+            "upper": v["upper"],
+            "middle": v["middle"],
+            "lower": v["lower"],
+            "width_pct": v["width_pct"],
+            "price_position_pct": v["price_position_pct"],
+        }
+        for v in series_raw
+    ]
+
+    latest_time = _to_jst(result["open_time"]).isoformat() if result.get("open_time") else None
+    latest = {
+        "time": latest_time,
+        "upper": result["upper"],
+        "middle": result["middle"],
+        "lower": result["lower"],
+        "width_pct": result["width_pct"],
+        "price_position_pct": result["price_position_pct"],
+    }
+
+    return {
+        "success": True,
+        "product_code": pc,
+        "timeframe": timeframe,
+        "period": period,
+        "std_dev": std_dev,
+        "current_price": result["current_price"],
+        "latest": latest,
+        "values": values,
+        "candles_used": result["candles_used"],
+    }

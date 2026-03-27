@@ -268,6 +268,71 @@ class BaseCandleService:
             series.append({"time": times[i + 1], "value": round(atr, 6)})
         return series[-limit:]
 
+    async def get_bb(
+        self, symbol: str, timeframe: str, period: int = 20, std_dev: float = 2.0
+    ) -> Optional[dict]:
+        """볼린저밴드 최신값 반환. 캔들 부족 시 None."""
+        candles = await self.get_completed_candles(symbol, timeframe, limit=period * 2)
+        if len(candles) < period:
+            return None
+        closes = [float(c.close) for c in candles]
+        window = closes[-period:]
+        middle = sum(window) / period
+        variance = sum((x - middle) ** 2 for x in window) / period
+        std = variance ** 0.5
+        upper = middle + std_dev * std
+        lower = middle - std_dev * std
+        width_pct = round((upper - lower) / middle * 100, 4) if middle > 0 else 0.0
+        current_price = float(candles[-1].close)
+        price_position_pct = (
+            round((current_price - lower) / (upper - lower) * 100, 2)
+            if upper != lower else 50.0
+        )
+        return {
+            "upper": round(upper, 6),
+            "middle": round(middle, 6),
+            "lower": round(lower, 6),
+            "width_pct": width_pct,
+            "current_price": current_price,
+            "price_position_pct": price_position_pct,
+            "candles_used": len(closes),
+            "open_time": candles[-1].open_time,
+        }
+
+    async def get_bb_series(
+        self, symbol: str, timeframe: str, period: int = 20, std_dev: float = 2.0, limit: int = 1
+    ) -> list[dict]:
+        """볼린저밴드 시계열 반환."""
+        fetch_limit = limit + period
+        candles = await self.get_completed_candles(symbol, timeframe, limit=fetch_limit)
+        if len(candles) < period:
+            return []
+        closes = [float(c.close) for c in candles]
+        times = [c.open_time for c in candles]
+        series = []
+        for i in range(period - 1, len(closes)):
+            window = closes[i - period + 1: i + 1]
+            middle = sum(window) / period
+            variance = sum((x - middle) ** 2 for x in window) / period
+            std = variance ** 0.5
+            upper = middle + std_dev * std
+            lower = middle - std_dev * std
+            width_pct = round((upper - lower) / middle * 100, 4) if middle > 0 else 0.0
+            current = closes[i]
+            price_position_pct = (
+                round((current - lower) / (upper - lower) * 100, 2)
+                if upper != lower else 50.0
+            )
+            series.append({
+                "time": times[i],
+                "upper": round(upper, 6),
+                "middle": round(middle, 6),
+                "lower": round(lower, 6),
+                "width_pct": width_pct,
+                "price_position_pct": price_position_pct,
+            })
+        return series[-limit:]
+
     # ── 내부 DB 헬퍼 ────────────────────────────────────────────
 
     async def _load_or_create_candle(self, symbol, tf, open_time, price, amount, ts):
