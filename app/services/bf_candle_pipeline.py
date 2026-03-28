@@ -28,7 +28,7 @@ from app.services.bf_ws_client import get_bitflyer_ws_client
 logger = logging.getLogger(__name__)
 
 _FLUSH_INTERVAL = 30       # 초
-_DEFAULT_BACKFILL_DAYS = 7
+_DEFAULT_BACKFILL_DAYS = 180  # 타임프레임 최적화 백테스트 요건 (TIMEFRAME_OPTIMIZATION.md T-02)
 
 
 class BfCandlePipeline:

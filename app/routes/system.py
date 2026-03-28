@@ -14,6 +14,8 @@ from fastapi.responses import JSONResponse
 
 from app.services.bf_ws_client import get_bitflyer_ws_client
 from app.services.bf_candle_pipeline import get_bf_candle_pipeline
+from app.services.gmo_candle_pipeline import get_gmo_candle_pipeline
+from app.core.config import get_settings
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
@@ -58,8 +60,19 @@ async def system_health():
     if not bf_pipeline_ok:
         issues.append("bf_candle_pipeline: 실행 중인 product 없음")
 
+    # ── GMO FX Candle Pipeline Tasks ──────────────────────────
+    gmo_pipeline = get_gmo_candle_pipeline()
+    gmo_running = gmo_pipeline.running_pairs()
+    gmo_fx_pairs = get_settings().gmo_fx_pairs_list
+    gmo_pipeline_ok = True
+    if gmo_fx_pairs:
+        # GMO FX가 설정되어 있으면 파이프라인도 실행 중이어야 함
+        if len(gmo_running) == 0:
+            issues.append("gmo_candle_pipeline: 실행 중인 pair 없음")
+            gmo_pipeline_ok = False
+
     recent_errors = _get_recent_log_errors("coinmarket-data")
-    healthy = bf_ws_ok and bf_pipeline_ok
+    healthy = bf_ws_ok and bf_pipeline_ok and gmo_pipeline_ok
 
     return JSONResponse(
         status_code=200 if healthy else 503,
@@ -75,6 +88,11 @@ async def system_health():
                 },
                 "bf_candle_pipeline": {
                     "running_products": bf_running,
+                },
+                "gmo_candle_pipeline": {
+                    "ok": gmo_pipeline_ok,
+                    "running_pairs": gmo_running,
+                    "configured_pairs": gmo_fx_pairs,
                 },
             },
             "issues": issues,

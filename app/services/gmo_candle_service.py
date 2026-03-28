@@ -120,12 +120,12 @@ class GmoCandleService:
 
         return count
 
-    async def backfill(self, pair: str, timeframe: str = "4h", year: Optional[int] = None) -> int:
+    async def backfill(self, pair: str, timeframe: str = "4h", year: Optional[int] = None, days: int = 180) -> int:
         """
         과거 캔들 백필.
 
         4H: date=YYYY → 연간 전체
-        1H: date=YYYYMMDD → 최근 N일
+        1H: date=YYYYMMDD → 최근 N일 (기본 180일)
         """
         client = get_gmo_public_client()
         symbol = pair.upper()
@@ -151,8 +151,8 @@ class GmoCandleService:
                     )
 
         elif timeframe == "1h":
-            # 1H: 최근 7일
-            for i in range(7):
+            # 1H: 최근 N일 (기본 180일 — 타임프레임 최적화 백테스트 요건)
+            for i in range(days):
                 day = now - timedelta(days=i)
                 date_str = day.strftime("%Y%m%d")
                 klines = await client.get_klines(
@@ -164,8 +164,11 @@ class GmoCandleService:
                 if klines:
                     count = await self._upsert_klines(pair, timeframe, klines, now)
                     total += count
-                # 레이트 리밋 배려
+                # 레이트 리밋 배려 (GET 6회/초)
                 await asyncio.sleep(0.2)
+            logger.info(
+                f"[GmoCandleService] 1H 백필 {symbol}: {days}일, 총 {total}건"
+            )
 
         return total
 

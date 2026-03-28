@@ -5,7 +5,7 @@ CK/BF 파이프라인과 달리 WS tick 집계 대신 KLine API 폴링 방식.
 GMO FX는 KLine API로 완성 캔들을 직접 제공하므로 구조가 더 단순.
 
 태스크 구성 (pair당 2개):
-  Task 1 — BackfillJob: 기동 시 1회. 과거 캔들 백필 (4H: 올해+작년, 1H: 최근 7일)
+  Task 1 — BackfillJob: 기동 시 1회. 과거 캔들 백필 (4H: 올해+작년, 1H: 최근 180일)
   Task 2 — PollWorker: 5분마다 최신 캔들 폴링 → DB UPSERT
 """
 import asyncio
@@ -63,6 +63,8 @@ class GmoCandlePipeline:
 
     # ── Task 1: 백필 (1회) ──────────────────────────────────────
 
+    _1H_BACKFILL_DAYS = 180  # 타임프레임 최적화 백테스트 요건 (TIMEFRAME_OPTIMIZATION.md T-01)
+
     async def _backfill_job(self, pair: str) -> None:
         try:
             svc = get_gmo_candle_service()
@@ -70,8 +72,8 @@ class GmoCandlePipeline:
             count_4h = await svc.backfill(pair, timeframe="4h")
             logger.info(f"[GmoCandlePipeline] {pair}: 4H 백필 완료 ({count_4h}건)")
 
-            logger.info(f"[GmoCandlePipeline] {pair}: 1H 백필 시작")
-            count_1h = await svc.backfill(pair, timeframe="1h")
+            logger.info(f"[GmoCandlePipeline] {pair}: 1H 백필 시작 ({self._1H_BACKFILL_DAYS}일)")
+            count_1h = await svc.backfill(pair, timeframe="1h", days=self._1H_BACKFILL_DAYS)
             logger.info(f"[GmoCandlePipeline] {pair}: 1H 백필 완료 ({count_1h}건)")
         except asyncio.CancelledError:
             pass
