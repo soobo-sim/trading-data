@@ -3,10 +3,12 @@ SQLAlchemy ORM 모델 — coinmarket-data 서비스용
 
 ck_candles: Coincheck 캔들 (기존 테이블, coincheck-trader에서 이관)
 bf_candles: BitFlyer 캔들 (신규 테이블)
+economic_events: 경제 캘린더 (ForexFactory, F-01 알파 팩터)
+intermarket_data: FRED 매크로 지표 (F-04 알파 팩터)
 """
 from sqlalchemy import (
     Column, BigInteger, Integer, String, Boolean,
-    DateTime, Numeric, Index, PrimaryKeyConstraint,
+    DateTime, Numeric, Index, PrimaryKeyConstraint, UniqueConstraint,
 )
 from sqlalchemy.sql import func
 from app.database import Base
@@ -126,3 +128,59 @@ class GmoCandle(Base):
 
     def __repr__(self):
         return f"<GmoCandle {self.pair} {self.timeframe} {self.open_time} complete={self.is_complete}>"
+
+
+class EconomicEvent(Base):
+    """
+    경제 캘린더 이벤트 (ForexFactory JSON API 기반, F-01 알파 팩터).
+
+    수집 주기: 6시간마다 thisweek + nextweek 교대 수집.
+    영향 통화: USD, JPY, GBP, EUR (FX 전략 연관 통화만 필터링).
+    impact: High, Medium만 저장 (Low/Holiday 제외).
+    """
+    __tablename__ = "economic_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+    country = Column(String(3), nullable=False)          # USD, JPY, GBP, EUR
+    event_time = Column(DateTime(timezone=True), nullable=False)
+    impact = Column(String(10), nullable=False)          # High, Medium
+    forecast = Column(String(50), nullable=True)
+    previous = Column(String(50), nullable=True)
+    actual = Column(String(50), nullable=True)           # 발표 후 업데이트
+    source = Column(String(20), nullable=False, default="forexfactory")
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("title", "event_time", name="uq_economic_events_title_time"),
+        Index("idx_economic_events_time", "event_time"),
+        Index("idx_economic_events_country", "country"),
+    )
+
+    def __repr__(self):
+        return f"<EconomicEvent {self.country} '{self.title}' at={self.event_time} impact={self.impact}>"
+
+
+class IntermarketData(Base):
+    """
+    FRED 매크로 경제 지표 (F-04 알파 팩터).
+
+    수집 주기: 매일 08:00 JST (FRED는 T+1 영업일 지연).
+    series_id: DGS10 / DGS2 / T10Y2Y / DEXJPUS / DTWEXBGS / VIXCLS
+    """
+    __tablename__ = "intermarket_data"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    series_id = Column(String(30), nullable=False)       # DGS10, VIXCLS 등
+    obs_date = Column(DateTime(timezone=False), nullable=False)  # DATE (UTC midnight)
+    value = Column(Numeric(12, 4), nullable=True)        # FRED는 결측치(".") 가능
+    source = Column(String(20), nullable=False, default="fred")
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("series_id", "obs_date", name="uq_intermarket_series_date"),
+        Index("idx_intermarket_series_date", "series_id", "obs_date"),
+    )
+
+    def __repr__(self):
+        return f"<IntermarketData {self.series_id} {self.obs_date} val={self.value}>"

@@ -24,6 +24,8 @@ from app.routes import system as system_router
 from app.routes import status as status_router
 from app.routes import bf_funding_rate as bf_funding_rate_router
 from app.routes import gmo_candles as gmo_candles_router
+from app.routes import economic_calendar as economic_calendar_router
+from app.routes import intermarket as intermarket_router
 
 
 def setup_logging():
@@ -134,13 +136,40 @@ async def lifespan(app: FastAPI):
             logger.info("GMO FX 캔들 파이프라인 비활성 (GMO_FX_PAIRS 미설정)")
     except Exception as e:
         logger.warning(f"GMO FX 캔들 파이프라인 시작 실패: {e}")
+    # 8. 경제 캘린더 수집기 시작
+    try:
+        from app.services.economic_calendar import get_economic_calendar_service
+        await get_economic_calendar_service().start()
+        logger.info("경제 캘린더 폴러 시작 (6시간 주기)")
+    except Exception as e:
+        logger.warning(f"경제 캘린더 폴러 시작 실패: {e}")
 
+    # 9. FRED 매크로 지표 수집기 시작 (F-04)
+    try:
+        from app.services.fred_service import get_fred_service
+        await get_fred_service().start()
+        logger.info("FRED 매크로 지표 수집기 시작 (매일 08:00 JST)")
+    except Exception as e:
+        logger.warning(f"FRED 수집기 시작 실패: {e}")
     logger.info(f"CoinMarket Data Service 준비 완료 — port 8002")
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────
-    logger.info("CoinMarket Data Service 종료 중...")
-    # 펀딩레이트 폴러 종료
+    logger.info("CoinMarket Data Service 종료 중...")    # 경제 캘린더 폴러 종료
+    try:
+        from app.services.economic_calendar import get_economic_calendar_service
+        await get_economic_calendar_service().stop()
+        logger.info("경제 캘린더 폴러 종료")
+    except Exception as e:
+        logger.warning(f"경제 캘린더 폴러 종료 오류: {e}")
+
+    # FRED 매크로 지표 수집기 종료
+    try:
+        from app.services.fred_service import get_fred_service
+        await get_fred_service().stop()
+        logger.info("FRED 수집기 종료")
+    except Exception as e:
+        logger.warning(f"FRED 수집기 종료 오류: {e}")    # 펀딩레이트 폴러 종료
     try:
         from app.services.bf_funding_rate_service import get_bf_funding_rate_service
         await get_bf_funding_rate_service().stop()
@@ -244,6 +273,8 @@ app.include_router(bf_market.router)
 app.include_router(bf_candles_router.router)
 app.include_router(bf_funding_rate_router.router)
 app.include_router(gmo_candles_router.router)
+app.include_router(economic_calendar_router.router)
+app.include_router(intermarket_router.router)
 app.include_router(system_router.router)
 app.include_router(status_router.router)
 

@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     GMOFX_BASE_URL: str = "https://forex-api.coin.z.com"
     GMO_FX_PAIRS: str = ""                         # 쉼표 구분 (예: "USD_JPY,EUR_JPY"), 빈 문자열이면 비활성
 
+    # ── FRED API (F-04 매크로 팩터) ───────────────────────────
+    FRED_API_KEY: str = ""                         # https://fred.stlouisfed.org/docs/api/api_key.html
+    FRED_BASE_URL: str = "https://api.stlouisfed.org/fred"
+    FRED_FETCH_HOUR_JST: int = 8                   # 매일 08:00 JST 수집
+
     @property
     def bf_ws_products_list(self) -> list[str]:
         return [p.strip().upper() for p in self.BF_WS_PRODUCTS.split(",") if p.strip()]
