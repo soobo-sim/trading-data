@@ -1,6 +1,6 @@
 """
 BitFlyer Public REST API 클라이언트 (인증 불필요)
-coinmarket-data 서비스용 — bitflyer-trader에서 이관
+trading-data 서비스용 — bitflyer-trader에서 이관
 """
 import logging
 from typing import Optional

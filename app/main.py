@@ -26,6 +26,7 @@ from app.routes import bf_funding_rate as bf_funding_rate_router
 from app.routes import gmo_candles as gmo_candles_router
 from app.routes import economic_calendar as economic_calendar_router
 from app.routes import intermarket as intermarket_router
+from app.routes import news as news_router
 
 
 def setup_logging():
@@ -47,7 +48,7 @@ def setup_logging():
     root.addHandler(ch)
 
     fh = TimedRotatingFileHandler(
-        filename="logs/coinmarket-data.log",
+        filename="logs/trading-data.log",
         when="midnight", interval=1, backupCount=14,
         encoding="utf-8", utc=False,
     )
@@ -151,6 +152,15 @@ async def lifespan(app: FastAPI):
         logger.info("FRED 매크로 지표 수집기 시작 (매일 08:00 JST)")
     except Exception as e:
         logger.warning(f"FRED 수집기 시작 실패: {e}")
+
+    # 10. 뉴스 수집기 시작 (Marketaux, 15분 주기)
+    try:
+        from app.services.news_collector import get_news_collector_service
+        await get_news_collector_service().start()
+        logger.info("뉴스 수집기 시작 (15분 주기, Marketaux)")
+    except Exception as e:
+        logger.warning(f"뉴스 수집기 시작 실패: {e}")
+
     logger.info(f"CoinMarket Data Service 준비 완료 — port 8002")
     yield
 
@@ -169,7 +179,17 @@ async def lifespan(app: FastAPI):
         await get_fred_service().stop()
         logger.info("FRED 수집기 종료")
     except Exception as e:
-        logger.warning(f"FRED 수집기 종료 오류: {e}")    # 펀딩레이트 폴러 종료
+        logger.warning(f"FRED 수집기 종료 오류: {e}")
+
+    # 뉴스 수집기 종료
+    try:
+        from app.services.news_collector import get_news_collector_service
+        await get_news_collector_service().stop()
+        logger.info("뉴스 수집기 종료")
+    except Exception as e:
+        logger.warning(f"뉴스 수집기 종료 오류: {e}")
+
+    # 펀딩레이트 폴러 종료
     try:
         from app.services.bf_funding_rate_service import get_bf_funding_rate_service
         await get_bf_funding_rate_service().stop()
@@ -275,6 +295,7 @@ app.include_router(bf_funding_rate_router.router)
 app.include_router(gmo_candles_router.router)
 app.include_router(economic_calendar_router.router)
 app.include_router(intermarket_router.router)
+app.include_router(news_router.router)
 app.include_router(system_router.router)
 app.include_router(status_router.router)
 

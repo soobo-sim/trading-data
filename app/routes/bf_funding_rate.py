@@ -1,5 +1,5 @@
 """
-BitFlyer Funding Rate API 라우트 (coinmarket-data 서비스)
+BitFlyer Funding Rate API 라우트 (trading-data 서비스)
 
 GET /api/bf/funding-rate          — FX_BTC_JPY 최신 펀딩레이트
 GET /api/bf/funding-rate/history  — 수집 이력 (limit 1–200)

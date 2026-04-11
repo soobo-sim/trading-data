@@ -1,6 +1,6 @@
 """
 Market Pulse 서비스 — BitFlyer WS 기반 시장 분석
-coinmarket-data 서비스용 — bitflyer-trader에서 이관
+trading-data 서비스용 — bitflyer-trader에서 이관
 """
 import logging
 from typing import Optional

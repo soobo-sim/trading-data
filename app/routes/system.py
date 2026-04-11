@@ -71,7 +71,7 @@ async def system_health():
             issues.append("gmo_candle_pipeline: 실행 중인 pair 없음")
             gmo_pipeline_ok = False
 
-    recent_errors = _get_recent_log_errors("coinmarket-data")
+    recent_errors = _get_recent_log_errors("trading-data")
     healthy = bf_ws_ok and bf_pipeline_ok and gmo_pipeline_ok
 
     return JSONResponse(

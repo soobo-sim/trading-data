@@ -1,4 +1,4 @@
-"""Alembic environment configuration for coinmarket-data (async SQLAlchemy)."""
+"""Alembic environment configuration for trading-data (async SQLAlchemy)."""
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -32,7 +32,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
-        version_table="alembic_version_cmd",  # coinmarket-data 전용 버전 테이블
+        version_table="alembic_version_cmd",  # trading-data 전용 버전 테이블
     )
     with context.begin_transaction():
         context.run_migrations()

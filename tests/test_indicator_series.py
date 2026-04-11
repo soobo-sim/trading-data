@@ -1,7 +1,7 @@
 """
 인디케이터 시계열 계산 테스트 — BUG-012 수정 검증.
 
-coinmarket-data EMA/RSI/ATR 시계열 메서드가 올바른 구조와 값을 반환하는지 확인.
+trading-data EMA/RSI/ATR 시계열 메서드가 올바른 구조와 값을 반환하는지 확인.
 DB 의존성 없이 순수 계산 로직만 테스트.
 """
 import pytest

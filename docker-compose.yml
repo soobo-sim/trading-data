@@ -33,13 +33,13 @@ services:
     networks:
       - trader-network
 
-  coinmarket-data:
+  trading-data:
     build:
       context: .
       dockerfile: Dockerfile
       target: production
-    image: coinmarket-data
-    container_name: coinmarket-data
+    image: trading-data
+    container_name: trading-data
     ports:
       - "127.0.0.1:8002:8002"
     environment:
@@ -71,9 +71,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-# 기동 순서: coinmarket-data → trading-engine
-# coinmarket-data가 PostgreSQL과 trader-network를 제공한다.
-# cd coinmarket-data  && docker-compose up -d
+# 기동 순서: trading-data → trading-engine
+# trading-data가 PostgreSQL과 trader-network를 제공한다.
+# cd trading-data  && docker-compose up -d
 # cd trading-engine   && docker-compose up -d
 
 volumes:

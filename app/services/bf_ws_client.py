@@ -1,6 +1,6 @@
 """
 BitFlyer Public WebSocket 클라이언트 — JSON-RPC 2.0 프로토콜
-coinmarket-data 서비스용
+trading-data 서비스용
 
 멀티 product 지원 (BF_WS_PRODUCTS 환경변수)
   예: BF_WS_PRODUCTS=BTC_JPY,ETH_JPY,XRP_JPY

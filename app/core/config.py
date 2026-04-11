@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     FRED_BASE_URL: str = "https://api.stlouisfed.org/fred"
     FRED_FETCH_HOUR_JST: int = 8                   # 매일 08:00 JST 수집
 
+    # ── Marketaux API (뉴스 수집) ─────────────────────────────
+    MARKETAUX_API_TOKEN: str = ""                  # https://www.marketaux.com/register
+    MARKETAUX_POLL_INTERVAL: int = 900             # 15분 (초)
+
     @property
     def bf_ws_products_list(self) -> list[str]:
         return [p.strip().upper() for p in self.BF_WS_PRODUCTS.split(",") if p.strip()]
@@ -51,6 +55,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # .env에 정의되지 않은 키(TZ 등) 무시
 
 
 @lru_cache()

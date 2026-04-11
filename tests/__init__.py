@@ -1,1 +1,1 @@
-"""Tests for coinmarket-data service."""
+"""Tests for trading-data service."""

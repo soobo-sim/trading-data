@@ -1,5 +1,5 @@
 """
-SQLAlchemy ORM 모델 — coinmarket-data 서비스용
+SQLAlchemy ORM 모델 — trading-data 서비스용
 
 ck_candles: Coincheck 캔들 (기존 테이블, coincheck-trader에서 이관)
 bf_candles: BitFlyer 캔들 (신규 테이블)
@@ -12,6 +12,42 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 from app.database import Base
+
+
+class NewsArticle(Base):
+    """
+    금융 뉴스 기사 (Marketaux API 수집).
+
+    수집 소스: Marketaux (무료 100건/일, 실시간, sentiment 내장)
+    수집 주기: 15분 (쿼리 라운드 로빈: crypto → forex → macro)
+    sentiment_score: entities[].sentiment_score 평균 (-1.0 ~ 1.0)
+    category: crypto | forex | macro (검색 쿼리 기반 분류)
+    """
+    __tablename__ = "news_articles"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uuid = Column(String(50), nullable=False, unique=True)       # Marketaux UUID
+    title = Column(String(500), nullable=False)
+    snippet = Column(String(1000), nullable=True)                # 기사 요약
+    source = Column(String(100), nullable=False)                 # 도메인 (reuters.com 등)
+    url = Column(String(1000), nullable=False)
+    published_at = Column(DateTime(timezone=True), nullable=False)
+    language = Column(String(5), nullable=False, default="en")
+    symbols = Column(String(200), nullable=True)                 # 쉼표 구분 (BTC,USDJPY 등)
+    entity_type = Column(String(30), nullable=True)              # cryptocurrency | currency | equity
+    sentiment_score = Column(Numeric(5, 4), nullable=True)       # -1.0 ~ 1.0 (entities 평균)
+    category = Column(String(50), nullable=False, default="general")  # crypto | forex | macro
+    collector_source = Column(String(20), nullable=False, default="marketaux")
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("idx_news_articles_published", "published_at"),
+        Index("idx_news_articles_category", "category"),
+        Index("idx_news_articles_symbols", "symbols"),
+    )
+
+    def __repr__(self):
+        return f"<NewsArticle [{self.category}] '{self.title[:40]}' at={self.published_at}>"
 
 
 class CkCandle(Base):

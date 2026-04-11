@@ -43,3 +43,33 @@ class TestBfWsProductsList:
     def test_empty_string(self):
         s = _settings(BF_WS_PRODUCTS="")
         assert s.bf_ws_products_list == []
+
+
+class TestMarketauxSettings:
+    """MARKETAUX_API_TOKEN + MARKETAUX_POLL_INTERVAL 설정 파싱 테스트."""
+
+    def test_token_default_empty(self):
+        """토큰 명시적 빈 문자열 설정 시 비활성."""
+        s = _settings(MARKETAUX_API_TOKEN="")
+        assert s.MARKETAUX_API_TOKEN == ""
+        assert not bool(s.MARKETAUX_API_TOKEN)
+
+    def test_token_from_env(self):
+        """환경변수로 토큰 설정 가능."""
+        s = _settings(MARKETAUX_API_TOKEN="my-test-token")
+        assert s.MARKETAUX_API_TOKEN == "my-test-token"
+
+    def test_poll_interval_default(self):
+        """폴링 주기 기본값 900초 (15분)."""
+        s = _settings()
+        assert s.MARKETAUX_POLL_INTERVAL == 900
+
+    def test_poll_interval_override(self):
+        """폴링 주기 오버라이드."""
+        s = _settings(MARKETAUX_POLL_INTERVAL=300)
+        assert s.MARKETAUX_POLL_INTERVAL == 300
+
+    def test_token_configured_detection(self):
+        """토큰 설정 여부로 수집기 활성 판단."""
+        assert not bool(_settings(MARKETAUX_API_TOKEN="").MARKETAUX_API_TOKEN)
+        assert bool(_settings(MARKETAUX_API_TOKEN="abc").MARKETAUX_API_TOKEN)
