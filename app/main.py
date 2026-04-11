@@ -4,6 +4,7 @@ FastAPI 진입점 — BitFlyer / GMO FX 마켓 데이터 수집 및 API 제공
 Port: 8002
 """
 import asyncio
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -27,33 +28,52 @@ from app.routes import gmo_candles as gmo_candles_router
 from app.routes import economic_calendar as economic_calendar_router
 from app.routes import intermarket as intermarket_router
 from app.routes import news as news_router
+from app.routes import sentiment as sentiment_router
+
+
+class JSONFormatter(logging.Formatter):
+    """JSON 구조화 로그 포맷터 (trading-engine과 동일 형식)."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "exchange": "trading-data",
+        }
+        if record.exc_info and record.exc_info[0] is not None:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_entry, ensure_ascii=False)
 
 
 def setup_logging():
     os.makedirs("logs", exist_ok=True)
     s = get_settings()
-    level = getattr(logging, s.LOG_LEVEL.upper(), logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    console_level = getattr(logging, s.LOG_LEVEL.upper(), logging.INFO)
+    json_fmt = JSONFormatter()
 
     root = logging.getLogger()
-    root.setLevel(level)
+    root.setLevel(logging.DEBUG)  # 루트는 DEBUG — 파일에 전부 남김
     root.handlers.clear()
 
     for noisy in ("websockets", "websockets.client", "httpcore", "asyncio"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
+    # 1) 콘솔: LOG_LEVEL 이상
     ch = logging.StreamHandler()
-    ch.setLevel(level)
-    ch.setFormatter(formatter)
+    ch.setLevel(console_level)
+    ch.setFormatter(json_fmt)
     root.addHandler(ch)
 
+    # 2) 파일: DEBUG 이상 (30일 보관)
     fh = TimedRotatingFileHandler(
         filename="logs/trading-data.log",
-        when="midnight", interval=1, backupCount=14,
+        when="midnight", interval=1, backupCount=30,
         encoding="utf-8", utc=False,
     )
-    fh.setLevel(level)
-    fh.setFormatter(formatter)
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(json_fmt)
     fh.suffix = "%Y-%m-%d"
     root.addHandler(fh)
 
@@ -161,6 +181,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"뉴스 수집기 시작 실패: {e}")
 
+    # 11. 센티먼트 수집기 시작 (Alternative.me FNG, 1시간 주기)
+    try:
+        from app.services.sentiment_collector import get_sentiment_collector_service
+        await get_sentiment_collector_service().start()
+        logger.info("센티먼트 수집기 시작 (1시간 주기, Alternative.me FNG)")
+    except Exception as e:
+        logger.warning(f"센티먼트 수집기 시작 실패: {e}")
+
     logger.info(f"CoinMarket Data Service 준비 완료 — port 8002")
     yield
 
@@ -188,6 +216,14 @@ async def lifespan(app: FastAPI):
         logger.info("뉴스 수집기 종료")
     except Exception as e:
         logger.warning(f"뉴스 수집기 종료 오류: {e}")
+
+    # 센티먼트 수집기 종료
+    try:
+        from app.services.sentiment_collector import get_sentiment_collector_service
+        await get_sentiment_collector_service().stop()
+        logger.info("센티먼트 수집기 종료")
+    except Exception as e:
+        logger.warning(f"센티먼트 수집기 종료 오류: {e}")
 
     # 펀딩레이트 폴러 종료
     try:
@@ -296,6 +332,7 @@ app.include_router(gmo_candles_router.router)
 app.include_router(economic_calendar_router.router)
 app.include_router(intermarket_router.router)
 app.include_router(news_router.router)
+app.include_router(sentiment_router.router)
 app.include_router(system_router.router)
 app.include_router(status_router.router)
 

@@ -5,6 +5,7 @@ ck_candles: Coincheck 캔들 (기존 테이블, coincheck-trader에서 이관)
 bf_candles: BitFlyer 캔들 (신규 테이블)
 economic_events: 경제 캘린더 (ForexFactory, F-01 알파 팩터)
 intermarket_data: FRED 매크로 지표 (F-04 알파 팩터)
+sentiment_scores: Fear & Greed Index (Alternative.me API)
 """
 from sqlalchemy import (
     Column, BigInteger, Integer, String, Boolean,
@@ -12,6 +13,33 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 from app.database import Base
+
+
+class SentimentScore(Base):
+    """
+    センチメント스코어 (Alternative.me Fear & Greed Index 수집).
+
+    수집 소스: Alternative.me FNG API (무료, 레이트 리밋 없음)
+    수집 주기: 1시간 (FNG 갱신 주기와 동일)
+    score: 0~100 (0=Extreme Fear, 100=Extreme Greed)
+    classification: Extreme Fear | Fear | Neutral | Greed | Extreme Greed
+    raw_timestamp: FNG API의 Unix timestamp (갱신 시각)
+    """
+    __tablename__ = "sentiment_scores"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), nullable=False)          # "alternative_me_fng"
+    score = Column(Integer, nullable=False)               # 0~100
+    classification = Column(String(30), nullable=False)  # "Extreme Fear" | ... | "Extreme Greed"
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    raw_timestamp = Column(BigInteger, nullable=True)    # FNG API timestamp
+
+    __table_args__ = (
+        Index("idx_sentiment_scores_source_fetched", "source", "fetched_at"),
+    )
+
+    def __repr__(self):
+        return f"<SentimentScore source={self.source} score={self.score} [{self.classification}]>"
 
 
 class NewsArticle(Base):
