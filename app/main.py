@@ -8,7 +8,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from logging.handlers import TimedRotatingFileHandler
 
 from fastapi import FastAPI, Request
@@ -34,9 +34,11 @@ from app.routes import sentiment as sentiment_router
 class JSONFormatter(logging.Formatter):
     """JSON 구조화 로그 포맷터 (trading-engine과 동일 형식)."""
 
+    _JST = timezone(timedelta(hours=9))
+
     def format(self, record: logging.LogRecord) -> str:
         log_entry = {
-            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "ts": datetime.fromtimestamp(record.created, tz=self._JST).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

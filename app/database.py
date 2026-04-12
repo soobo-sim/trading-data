@@ -3,9 +3,9 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()는 pydantic-settings가 이미 처리하므로 호출하지 않는다.
+# 모듈 레벨 load_dotenv()는 OS 환경변수를 오염시켜 테스트 격리를 파괴한다.
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
