@@ -25,6 +25,7 @@ from app.routes import system as system_router
 from app.routes import status as status_router
 from app.routes import bf_funding_rate as bf_funding_rate_router
 from app.routes import gmo_candles as gmo_candles_router
+from app.routes import gmo_coin_candles as gmo_coin_candles_router
 from app.routes import economic_calendar as economic_calendar_router
 from app.routes import intermarket as intermarket_router
 from app.routes import news as news_router
@@ -159,7 +160,25 @@ async def lifespan(app: FastAPI):
             logger.info("GMO FX 캔들 파이프라인 비활성 (GMO_FX_PAIRS 미설정)")
     except Exception as e:
         logger.warning(f"GMO FX 캔들 파이프라인 시작 실패: {e}")
-    # 8. 경제 캘린더 수집기 시작
+    # 8. GMO 코인 캔들 파이프라인 시작 (설정된 모든 pair)
+    try:
+        gmoc_pairs = settings.gmo_coin_pairs_list
+        if gmoc_pairs:
+            from app.services.gmo_coin_candle_pipeline import get_gmo_coin_candle_pipeline
+            gmoc_pipeline = get_gmo_coin_candle_pipeline()
+            for pair in gmoc_pairs:
+                task = asyncio.create_task(
+                    gmoc_pipeline.start(pair),
+                    name=f"gmo_coin_candle_pipeline_start:{pair}",
+                )
+                _background_tasks.append(task)
+            logger.info(f"GMO 코인 캔들 파이프라인 시작 요청: pairs={gmoc_pairs}")
+        else:
+            logger.info("GMO 코인 캔들 파이프라인 비활성 (GMO_COIN_PAIRS 미설정)")
+    except Exception as e:
+        logger.warning(f"GMO 코인 캔들 파이프라인 시작 실패: {e}")
+
+    # 9. 경제 캘린더 수집기 시작
     try:
         from app.services.economic_calendar import get_economic_calendar_service
         await get_economic_calendar_service().start()
@@ -252,6 +271,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"GMO FX 캔들 파이프라인 종료 오류: {e}")
 
+    # GMO 코인 캔들 파이프라인 종료
+    try:
+        if settings.gmo_coin_pairs_list:
+            from app.services.gmo_coin_candle_pipeline import get_gmo_coin_candle_pipeline
+            await get_gmo_coin_candle_pipeline().stop_all()
+            logger.info("GMO 코인 캔들 파이프라인 종료")
+    except Exception as e:
+        logger.warning(f"GMO 코인 캔들 파이프라인 종료 오류: {e}")
+
     for task in _background_tasks:
         if not task.done():
             task.cancel()
@@ -274,6 +302,12 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.gmo_public_client import close_gmo_public_client
         await close_gmo_public_client()
+    except Exception:
+        pass
+
+    try:
+        from app.services.gmo_coin_public_client import close_gmo_coin_public_client
+        await close_gmo_coin_public_client()
     except Exception:
         pass
 
@@ -331,6 +365,7 @@ app.include_router(bf_market.router)
 app.include_router(bf_candles_router.router)
 app.include_router(bf_funding_rate_router.router)
 app.include_router(gmo_candles_router.router)
+app.include_router(gmo_coin_candles_router.router)
 app.include_router(economic_calendar_router.router)
 app.include_router(intermarket_router.router)
 app.include_router(news_router.router)

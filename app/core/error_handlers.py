@@ -3,6 +3,7 @@ import logging
 import httpx
 from functools import wraps
 from typing import Callable, Any
+from fastapi import HTTPException
 from app.core.exceptions import MarketDataAPIError
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,8 @@ def handle_api_errors(operation: str):
         async def wrapper(*args, **kwargs) -> Any:
             try:
                 return await func(*args, **kwargs)
+            except HTTPException:
+                raise  # FastAPI가 직접 처리하도록 re-raise
             except httpx.HTTPStatusError as e:
                 logger.error(f"{operation} HTTP error: {e.response.status_code} - {e.response.text}")
                 raise MarketDataAPIError(

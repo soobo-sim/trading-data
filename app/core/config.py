@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     GMOFX_BASE_URL: str = "https://forex-api.coin.z.com"
     GMO_FX_PAIRS: str = ""                         # 쉼표 구분 (예: "USD_JPY,EUR_JPY"), 빈 문자열이면 비활성
 
+    # ── GMO Coin ──────────────────────────────────────────────
+    GMO_COIN_BASE_URL: str = "https://api.coin.z.com"
+    GMO_COIN_PAIRS: str = ""                       # 쉼표 구분 (예: "BTC_JPY"), 빈 문자열이면 비활성
+
     # ── FRED API (F-04 매크로 팩터) ───────────────────────────
     FRED_API_KEY: str = ""                         # https://fred.stlouisfed.org/docs/api/api_key.html
     FRED_BASE_URL: str = "https://api.stlouisfed.org/fred"
@@ -51,6 +55,10 @@ class Settings(BaseSettings):
     @property
     def gmo_fx_pairs_list(self) -> list[str]:
         return [p.strip().upper() for p in self.GMO_FX_PAIRS.split(",") if p.strip()]
+
+    @property
+    def gmo_coin_pairs_list(self) -> list[str]:
+        return [p.strip().upper() for p in self.GMO_COIN_PAIRS.split(",") if p.strip()]
 
     class Config:
         env_file = ".env"

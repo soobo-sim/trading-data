@@ -194,6 +194,38 @@ class GmoCandle(Base):
         return f"<GmoCandle {self.pair} {self.timeframe} {self.open_time} complete={self.is_complete}>"
 
 
+class GmocCandle(Base):
+    """
+    GMO 코인 OHLCV 캔들 (1H / 4H)
+    KLine API 폴링으로 수집 (tick 집계 아님)
+    Volume: GMO 코인은 실제 거래량 제공 (GMO FX와 달리 0이 아님)
+    """
+    __tablename__ = "gmoc_candles"
+
+    pair = Column(String(20), nullable=False)             # btc_jpy 등
+    timeframe = Column(String(5), nullable=False)         # "1h" | "4h"
+    open_time = Column(DateTime(timezone=True), nullable=False)
+    close_time = Column(DateTime(timezone=True), nullable=False)
+    open = Column(Numeric(18, 8), nullable=False)
+    high = Column(Numeric(18, 8), nullable=False)
+    low = Column(Numeric(18, 8), nullable=False)
+    close = Column(Numeric(18, 8), nullable=False)
+    volume = Column(Numeric(24, 8), nullable=False)       # 실제 거래량 (DEFAULT 없음)
+    tick_count = Column(Integer, nullable=False, default=0)
+    is_complete = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        PrimaryKeyConstraint("pair", "timeframe", "open_time", name="gmoc_candles_pkey"),
+        Index("idx_gmoc_candles_lookup", "pair", "timeframe", "open_time"),
+        Index("idx_gmoc_candles_incomplete", "pair", "timeframe", "is_complete"),
+    )
+
+    def __repr__(self):
+        return f"<GmocCandle {self.pair} {self.timeframe} {self.open_time} complete={self.is_complete}>"
+
+
 class EconomicEvent(Base):
     """
     경제 캘린더 이벤트 (ForexFactory JSON API 기반, F-01 알파 팩터).
