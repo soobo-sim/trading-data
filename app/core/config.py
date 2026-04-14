@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # API
     API_VERSION: str = __version__
     API_TITLE: str = "CoinMarket Data API"
-    API_DESCRIPTION: str = "BitFlyer & GMO FX 마켓 데이터 수집 및 제공 서비스"
+    API_DESCRIPTION: str = "GMO Coin 마켓 데이터 수집 및 제공 서비스"
     DEBUG: bool = False
 
     # Database (coincheck-trader / bitflyer-trader 와 동일 인스턴스 공유)
@@ -21,21 +21,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_RETENTION_DAYS: int = 14
 
-    # ── BitFlyer ──────────────────────────────────────────────────
-    BITFLYER_BASE_URL: str = "https://api.bitflyer.com"
-    BITFLYER_WS_URL: str = "wss://ws.lightstream.bitflyer.com/json-rpc"
-    BF_WS_PRODUCTS: str = "BTC_JPY"               # 쉼표 구분 (예: "BTC_JPY,ETH_JPY,XRP_JPY")
-
-    # ── WebSocket 공통 설정 ───────────────────────────────────────
-    WS_WINDOW_SEC: int = 30               # market-pulse 분석 윈도우 (초)
-    WS_MAX_TRADES: int = 1000             # 메모리에 보관할 최대 체결 건수
-    WS_RECONNECT_MAX_DELAY: int = 30      # 재접속 최대 대기 시간 (초)
-
-    # ── GMO FX ────────────────────────────────────────────────
-    GMOFX_BASE_URL: str = "https://forex-api.coin.z.com"
-    GMO_FX_PAIRS: str = ""                         # 쉼표 구분 (예: "USD_JPY,EUR_JPY"), 빈 문자열이면 비활성
-
-    # ── GMO Coin ──────────────────────────────────────────────
+    # ── GMO Coin ──────────────────────────────────────────────────
     GMO_COIN_BASE_URL: str = "https://api.coin.z.com"
     GMO_COIN_PAIRS: str = ""                       # 쉼표 구분 (예: "BTC_JPY"), 빈 문자열이면 비활성
 
@@ -47,14 +33,6 @@ class Settings(BaseSettings):
     # ── Marketaux API (뉴스 수집) ─────────────────────────────
     MARKETAUX_API_TOKEN: str = ""                  # https://www.marketaux.com/register
     MARKETAUX_POLL_INTERVAL: int = 900             # 15분 (초)
-
-    @property
-    def bf_ws_products_list(self) -> list[str]:
-        return [p.strip().upper() for p in self.BF_WS_PRODUCTS.split(",") if p.strip()]
-
-    @property
-    def gmo_fx_pairs_list(self) -> list[str]:
-        return [p.strip().upper() for p in self.GMO_FX_PAIRS.split(",") if p.strip()]
 
     @property
     def gmo_coin_pairs_list(self) -> list[str]:

@@ -1,6 +1,6 @@
 """
 CoinMarket Data Service
-FastAPI 진입점 — BitFlyer / GMO FX 마켓 데이터 수집 및 API 제공
+FastAPI 진입점 — GMO Coin 마켓 데이터 수집 및 API 제공
 Port: 8002
 """
 import asyncio
@@ -20,11 +20,8 @@ from app import __version__
 from app.core.config import get_settings
 from app.core.exceptions import MarketDataAPIError
 from app.database import init_db, close_db
-from app.routes import bf_market, bf_candles as bf_candles_router
 from app.routes import system as system_router
 from app.routes import status as status_router
-from app.routes import bf_funding_rate as bf_funding_rate_router
-from app.routes import gmo_candles as gmo_candles_router
 from app.routes import gmo_coin_candles as gmo_coin_candles_router
 from app.routes import economic_calendar as economic_calendar_router
 from app.routes import intermarket as intermarket_router
@@ -98,68 +95,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("DB 연결 완료")
 
-    # 1b. 장애 복구: 이전 기동에서 완결되지 못한 stale 캔들 일괄 처리
-    try:
-        from app.services.bf_candle_service import get_bf_candle_service
-        from app.services.gmo_candle_service import get_gmo_candle_service
-        bf_fixed = await get_bf_candle_service().recover_stale_candles()
-        gmo_fixed = await get_gmo_candle_service().recover_stale_candles()
-        if bf_fixed or gmo_fixed:
-            logger.warning(f"[Startup] stale 캔들 복구 완료: BF={bf_fixed}건, GMO={gmo_fixed}건")
-        else:
-            logger.info("[Startup] stale 캔들 없음 (정상 종료 이력)")
-    except Exception as e:
-        logger.warning(f"[Startup] stale 캔들 복구 오류: {e}")
-
-    # 2. BitFlyer Public WebSocket 시작
-    try:
-        from app.services.bf_ws_client import get_bitflyer_ws_client
-        bf_ws = get_bitflyer_ws_client()
-        task = asyncio.create_task(bf_ws.connect(), name="bf_ws_client")
-        _background_tasks.append(task)
-        logger.info(f"BitFlyer WS 클라이언트 시작. Products: {settings.bf_ws_products_list}")
-    except Exception as e:
-        logger.warning(f"BitFlyer WS 시작 실패: {e}")
-
-    # 4. BitFlyer 캔들 파이프라인 시작 (설정된 모든 product)
-    try:
-        from app.services.bf_candle_pipeline import get_bf_candle_pipeline
-        bf_pipeline = get_bf_candle_pipeline()
-        for pc in settings.bf_ws_products_list:
-            task = asyncio.create_task(
-                bf_pipeline.start(pc),
-                name=f"bf_candle_pipeline_start:{pc}",
-            )
-            _background_tasks.append(task)
-        logger.info(f"BitFlyer 캔들 파이프라인 시작 요청: products={settings.bf_ws_products_list}")
-    except Exception as e:
-        logger.warning(f"BitFlyer 캔들 파이프라인 시작 실패: {e}")
-
-    # 4. BitFlyer 펀딩레이트 폴러 시작 (FX_BTC_JPY, 15분 주기)
-    try:
-        from app.services.bf_funding_rate_service import get_bf_funding_rate_service
-        await get_bf_funding_rate_service().start()
-        logger.info("BitFlyer 펀딩레이트 폴러 시작 (FX_BTC_JPY)")
-    except Exception as e:
-        logger.warning(f"BitFlyer 펀딩레이트 폴러 시작 실패: {e}")
-
-    # 7. GMO FX 캔들 파이프라인 시작 (설정된 모든 pair)
-    try:
-        gmo_pairs = settings.gmo_fx_pairs_list
-        if gmo_pairs:
-            from app.services.gmo_candle_pipeline import get_gmo_candle_pipeline
-            gmo_pipeline = get_gmo_candle_pipeline()
-            for pair in gmo_pairs:
-                task = asyncio.create_task(
-                    gmo_pipeline.start(pair),
-                    name=f"gmo_candle_pipeline_start:{pair}",
-                )
-                _background_tasks.append(task)
-            logger.info(f"GMO FX 캔들 파이프라인 시작 요청: pairs={gmo_pairs}")
-        else:
-            logger.info("GMO FX 캔들 파이프라인 비활성 (GMO_FX_PAIRS 미설정)")
-    except Exception as e:
-        logger.warning(f"GMO FX 캔들 파이프라인 시작 실패: {e}")
+    # 1b. (reserved for stale candle recovery if needed)
     # 8. GMO 코인 캔들 파이프라인 시작 (설정된 모든 pair)
     try:
         gmoc_pairs = settings.gmo_coin_pairs_list
@@ -246,31 +182,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"센티먼트 수집기 종료 오류: {e}")
 
-    # 펀딩레이트 폴러 종료
-    try:
-        from app.services.bf_funding_rate_service import get_bf_funding_rate_service
-        await get_bf_funding_rate_service().stop()
-        logger.info("펀딩레이트 폴러 종료")
-    except Exception as e:
-        logger.warning(f"펀딩레이트 폴러 종료 오류: {e}")
-
-    # BitFlyer 캔들 파이프라인 종료
-    try:
-        from app.services.bf_candle_pipeline import get_bf_candle_pipeline
-        await get_bf_candle_pipeline().stop_all()
-        logger.info("BitFlyer 캔들 파이프라인 종료")
-    except Exception as e:
-        logger.warning(f"BitFlyer 캔들 파이프라인 종료 오류: {e}")
-
-    # GMO FX 캔들 파이프라인 종료
-    try:
-        if settings.gmo_fx_pairs_list:
-            from app.services.gmo_candle_pipeline import get_gmo_candle_pipeline
-            await get_gmo_candle_pipeline().stop_all()
-            logger.info("GMO FX 캔들 파이프라인 종료")
-    except Exception as e:
-        logger.warning(f"GMO FX 캔들 파이프라인 종료 오류: {e}")
-
     # GMO 코인 캔들 파이프라인 종료
     try:
         if settings.gmo_coin_pairs_list:
@@ -285,25 +196,6 @@ async def lifespan(app: FastAPI):
             task.cancel()
     if _background_tasks:
         await asyncio.gather(*_background_tasks, return_exceptions=True)
-
-    try:
-        from app.services.bf_ws_client import close_bitflyer_ws_client
-        await close_bitflyer_ws_client()
-        logger.info("BitFlyer WS 클라이언트 종료")
-    except Exception:
-        pass
-
-    try:
-        from app.services.bf_public_client import close_bitflyer_public_client
-        await close_bitflyer_public_client()
-    except Exception:
-        pass
-
-    try:
-        from app.services.gmo_public_client import close_gmo_public_client
-        await close_gmo_public_client()
-    except Exception:
-        pass
 
     try:
         from app.services.gmo_coin_public_client import close_gmo_coin_public_client
@@ -361,10 +253,6 @@ async def internal_error_handler(request: Request, exc):
 
 # ── 라우터 등록 ────────────────────────────────────────────────
 
-app.include_router(bf_market.router)
-app.include_router(bf_candles_router.router)
-app.include_router(bf_funding_rate_router.router)
-app.include_router(gmo_candles_router.router)
 app.include_router(gmo_coin_candles_router.router)
 app.include_router(economic_calendar_router.router)
 app.include_router(intermarket_router.router)
@@ -382,9 +270,7 @@ async def root():
         "docs": "/docs",
         "status": "running",
         "endpoints": {
-            "bitflyer_market": "/api/bf/ticker | /api/bf/order_books | /api/bf/trades | /api/bf/ws/market-pulse",
-            "bf_candles": "/api/bf/candles/{product_code}/{timeframe} | /api/bf/candles/{product_code}/status",
-            "bf_funding_rate": "/api/bf/funding-rate | /api/bf/funding-rate/history",
+            "gmo_coin_candles": "/api/gmo-coin/candles/{pair}/{timeframe}",
         },
     }
 
