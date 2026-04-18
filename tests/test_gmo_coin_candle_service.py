@@ -566,12 +566,12 @@ class TestGmoCoinRouteValidation:
 
     def test_route_valid_pairs_btc_jpy(self):
         src = _read_source("app/routes/gmo_coin_candles.py")
-        assert '"BTC_JPY"' in src
+        assert '"btc_jpy"' in src  # _VALID_PAIRS 소문자 표준
 
     def test_route_valid_pairs_sui_jpy(self):
         """설계서 12번 페어 SUI_JPY 포함."""
         src = _read_source("app/routes/gmo_coin_candles.py")
-        assert '"SUI_JPY"' in src
+        assert '"sui_jpy"' in src  # _VALID_PAIRS 소문자 표준
 
     def test_route_validate_pair_tf_invalid_pair_raises(self):
         """_validate_pair_tf: 미지원 pair → HTTPException 400."""
@@ -589,7 +589,7 @@ class TestGmoCoinRouteValidation:
         from app.routes.gmo_coin_candles import _validate_pair_tf
 
         with pytest.raises(HTTPException) as exc_info:
-            _validate_pair_tf("BTC_JPY", "3h")
+            _validate_pair_tf("btc_jpy", "3h")  # 소문자 pair 표준
         assert exc_info.value.status_code == 400
         assert exc_info.value.detail["blocked_code"] == "INVALID_TIMEFRAME"
 
@@ -597,8 +597,8 @@ class TestGmoCoinRouteValidation:
         """_validate_pair_tf: 유효한 pair+timeframe → 예외 없음."""
         from app.routes.gmo_coin_candles import _validate_pair_tf
 
-        _validate_pair_tf("BTC_JPY", "4h")  # 예외 없어야 함
-        _validate_pair_tf("SOL_JPY", "1h")
+        _validate_pair_tf("btc_jpy", "4h")  # 소문자 pair 표준
+        _validate_pair_tf("sol_jpy", "1h")
 
     def test_route_status_endpoint_checks_valid_pair(self):
         """status 엔드포인트: 미지원 pair → HTTPException."""
@@ -640,3 +640,36 @@ class TestHandleApiErrorsHttpException:
             await _raise_400()
 
         assert exc_info.value.status_code == 400
+
+
+# ── normalize_pair 경계값 엣지 케이스 (NP-EC-01 ~ NP-EC-04) ───
+
+class TestRoutePairNormalization:
+    """gmo_coin_candles 라우트의 pair 정규화 동작 검증."""
+
+    def test_np_ec01_valid_pairs_set_is_lowercase(self):
+        """NP-EC-01: _VALID_PAIRS가 소문자로만 구성되어 있어야 함."""
+        from app.routes.gmo_coin_candles import _VALID_PAIRS
+        for p in _VALID_PAIRS:
+            assert p == p.lower(), f"_VALID_PAIRS에 대문자 포함됨: {p}"
+
+    def test_np_ec02_validate_pair_tf_rejects_uppercase(self):
+        """NP-EC-02: _validate_pair_tf에 대문자 직접 전달 → INVALID_PAIR.
+        라우트 핸들러에서 정규화 후 전달해야 한다."""
+        from fastapi import HTTPException
+        from app.routes.gmo_coin_candles import _validate_pair_tf
+
+        with pytest.raises(HTTPException) as exc_info:
+            _validate_pair_tf("BTC_JPY", "4h")  # 대문자 직접 → 거부
+        assert exc_info.value.detail["blocked_code"] == "INVALID_PAIR"
+
+    def test_np_ec03_validate_pair_tf_accepts_lowercase(self):
+        """NP-EC-03: _validate_pair_tf에 소문자 전달 → 예외 없음."""
+        from app.routes.gmo_coin_candles import _validate_pair_tf
+        _validate_pair_tf("btc_jpy", "4h")   # 정상
+        _validate_pair_tf("eth_jpy", "1h")   # 정상
+
+    def test_np_ec04_route_source_uses_strip_lower(self):
+        """NP-EC-04: 라우트 핸들러가 pair.strip().lower() 정규화를 적용함."""
+        src = _read_source("app/routes/gmo_coin_candles.py")
+        assert "pair.strip().lower()" in src

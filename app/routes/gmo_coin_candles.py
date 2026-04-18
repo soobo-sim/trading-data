@@ -14,13 +14,13 @@ from app.core.error_handlers import handle_api_errors
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/gmo-coin/candles", tags=["GMO Coin Candles"])
 
-# GMO 코인에서 레버리지 거래 가능한 주요 페어
+# GMO 코인에서 레버리지 거래 가능한 주요 페어 (소문자 — 라젠카 내부 표준)
 _VALID_PAIRS = {
-    "BTC_JPY", "ETH_JPY", "BCH_JPY", "LTC_JPY", "XRP_JPY",
-    "XEM_JPY", "XLM_JPY", "BAT_JPY", "OMG_JPY", "QTUM_JPY",
-    "ENS_JPY", "MKR_JPY", "DOT_JPY", "ATOM_JPY", "ADA_JPY",
-    "LINK_JPY", "DOGE_JPY", "SOL_JPY", "MATIC_JPY", "AVAX_JPY",
-    "APT_JPY", "FLR_JPY", "SUI_JPY",
+    "btc_jpy", "eth_jpy", "bch_jpy", "ltc_jpy", "xrp_jpy",
+    "xem_jpy", "xlm_jpy", "bat_jpy", "omg_jpy", "qtum_jpy",
+    "ens_jpy", "mkr_jpy", "dot_jpy", "atom_jpy", "ada_jpy",
+    "link_jpy", "doge_jpy", "sol_jpy", "matic_jpy", "avax_jpy",
+    "apt_jpy", "flr_jpy", "sui_jpy",
 }
 _VALID_TIMEFRAMES = {"1h", "4h"}
 
@@ -56,14 +56,14 @@ def _validate_pair_tf(pair: str, timeframe: str):
 async def get_pipeline_status(pair: str):
     from app.services.gmo_coin_candle_pipeline import get_gmo_coin_candle_pipeline
 
-    p = pair.upper()
+    p = pair.strip().lower()
     if p not in _VALID_PAIRS:
         raise HTTPException(400, {"blocked_code": "INVALID_PAIR"})
     pipeline = get_gmo_coin_candle_pipeline()
     return {
         "success": True,
         "pair": p,
-        "is_running": pipeline.is_running(p.lower()),
+        "is_running": pipeline.is_running(p),
         "running_pairs": pipeline.running_pairs(),
     }
 
@@ -79,14 +79,14 @@ async def get_candles(
     from app.database import AsyncSessionLocal
     from app.models.database import GmocCandle
 
-    p = pair.upper()
+    p = pair.strip().lower()
     _validate_pair_tf(p, timeframe)
 
     async with AsyncSessionLocal() as session:
         stmt = (
             select(GmocCandle)
             .where(
-                GmocCandle.pair == p.lower(),
+                GmocCandle.pair == p,
                 GmocCandle.timeframe == timeframe,
                 GmocCandle.is_complete.is_(True),
             )
