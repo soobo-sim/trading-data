@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     API_DESCRIPTION: str = "GMO Coin 마켓 데이터 수집 및 제공 서비스"
     DEBUG: bool = False
 
-    # Database (coincheck-trader / bitflyer-trader 와 동일 인스턴스 공유)
+    # Database (trader-postgres 공유 인스턴스)
     DATABASE_URL: str = "postgresql+asyncpg://trader:trader_password_123@localhost:5432/trader_db"
 
     # Logging
